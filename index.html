@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>실시간 주식 거래 시뮬레이터</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* (스타일 생략: 기존과 동일) */
+    /* 동일한 스타일 그대로 유지 */
+  </style>
+</head>
+<body>
+  <!-- (기존과 동일한 구조) -->
+
+  <script>
+    const ctx = document.getElementById('stockChart').getContext('2d');
+
+    const stocks = [
+      '초기투자',
+      '삼성전자', '현대차', 'LG전자', '카카오', '네이버',
+      '셀트리온', 'POSCO', 'SK하이닉스', '기아', '한화솔루션',
+      'NAVER', '신한지주', 'KB금융', '삼성바이오로직스', '롯데케미칼'
+    ];
+
+    const startPrices = {
+      '초기투자': 1000,
+      '삼성전자': 60000,
+      '현대차': 220000,
+      'LG전자': 130000,
+      '카카오': 70000,
+      '네이버': 300000,
+      '셀트리온': 250000,
+      'POSCO': 300000,
+      'SK하이닉스': 110000,
+      '기아': 85000,
+      '한화솔루션': 36000,
+      'NAVER': 300000,
+      '신한지주': 40000,
+      'KB금융': 47000,
+      '삼성바이오로직스': 850000,
+      '롯데케미칼': 300000
+    };
+
+    let currentStock = stocks[0];
+    let currentIndex = 50;
+    const maxDataLength = 50;
+
+    function getRandomPrice(prevPrice, stockName) {
+      let changePercent;
+
+      if (stockName === '초기투자') {
+        changePercent = Math.random() < 0.7
+          ? Math.random() * 0.05  // 70% 확률: +0% ~ +5%
+          : -(Math.random() * 0.03); // 30% 확률: -0% ~ -3%
+      } else {
+        changePercent = (Math.random() - 0.5) * 0.06;
+      }
+
+      let newPrice = prevPrice * (1 + changePercent);
+      if (newPrice < 1) newPrice = 1;
+      return Math.round(newPrice);
+    }
+
+    function generateInitialData(stockName) {
+      const start = startPrices[stockName];
+      const arr = [start];
+      for (let i = 1; i < maxDataLength; i++) {
+        arr.push(getRandomPrice(arr[i - 1], stockName));
+      }
+      return arr;
+    }
+
+    const stockData = {};
+    stocks.forEach(stock => {
+      stockData[stock] = generateInitialData(stock);
+    });
+
+    let userHoldings = {
+      cash: 50000,
+      shares: {},
+      avgBuyPrice: {},
+      tradeLog: []
+    };
+    stocks.forEach(s => {
+      userHoldings.shares[s] = 0;
+      userHoldings.avgBuyPrice[s] = null;
+    });
+
+    function saveData() {
+      localStorage.setItem("stockUserData", JSON.stringify(userHoldings));
+    }
+
+    function loadData() {
+      const saved = localStorage.getItem("stockUserData");
+      if (saved) {
+        userHoldings = JSON.parse(saved);
+      }
+    }
+
+    loadData();
+
+    const labels = Array.from({ length: maxDataLength }, (_, i) => i.toString());
+
+    const data = {
+      labels: [...labels],
+      datasets: [{
+        label: currentStock,
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        data: [...stockData[currentStock]],
+        tension: 0.3
+      }]
+    };
+
+    const config = {
+      type: 'line',
+      data: data,
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          x: { title: { display: true, text: '시간' }},
+          y: { title: { display: true, text: '가격' }, beginAtZero: false }
+        }
+      }
+    };
+
+    const chart = new Chart(ctx, config);
+
+    const stockButtonsDiv = document.getElementById('stockButtons');
+    stocks.forEach(stock => {
+      const btn = document.createElement('button');
+      btn.textContent = stock;
+      btn.onclick = () => selectStock(stock);
+      stockButtonsDiv.appendChild(btn);
+    });
+
+    function selectStock(name) {
+      currentStock = name;
+      currentIndex = stockData[name].length;
+      document.getElementById('stock-title').innerText = name;
+      data.datasets[0].label = name;
+      data.datasets[0].data = stockData[name];
+      data.labels = Array.from({ length: stockData[name].length }, (_, i) => i.toString());
+      chart.update();
+      updateInfo();
+      renderTradeLog();
+    }
+
+    function getCurrentPrice() {
+      return stockData[currentStock][stockData[currentStock].length - 1];
+    }
+
+    function buyStock() {
+      const price = getCurrentPrice();
+      const quantity = parseInt(document.getElementById('tradeAmount').value);
+      if (quantity <= 0) return alert("1 이상 수량 입력");
+      const totalCost = price * quantity;
+
+      if (userHoldings.cash >= totalCost) {
+        const prevShares = userHoldings.shares[currentStock];
+        const prevAvg = userHoldings.avgBuyPrice[currentStock];
+
+        const newShares = prevShares + quantity;
+        userHoldings.avgBuyPrice[currentStock] = prevShares === 0
+          ? price
+          : ((prevAvg * prevShares + price * quantity) / newShares);
+
+        userHoldings.cash -= totalCost;
+        userHoldings.shares[currentStock] = newShares;
+
+        userHoldings.tradeLog.unshift({
+          time: new Date().toLocaleTimeString(),
+          stock: currentStock,
+          type: '매수',
+          price, quantity,
+          total: totalCost,
+          profit: 0,
+          rate: "0%"
+        });
+
+        saveData();
+        updateInfo();
+        renderTradeLog();
+      } else {
+        alert("자금 부족");
+      }
+    }
+
+    function sellStock() {
+      const quantity = parseInt(document.getElementById('tradeAmount').value);
+      if (quantity <= 0) return alert("1 이상 수량 입력");
+
+      const owned = userHoldings.shares[currentStock];
+      if (owned < quantity) return alert("보유 수량 부족");
+
+      const price = getCurrentPrice();
+      const buyPrice = userHoldings.avgBuyPrice[currentStock];
+      const profit = (price - buyPrice) * quantity;
+      const rate = buyPrice ? ((price - buyPrice) / buyPrice * 100).toFixed(2) + "%" : "-";
+
+      userHoldings.cash += price * quantity;
+      userHoldings.shares[currentStock] -= quantity;
+      if (userHoldings.shares[currentStock] === 0) userHoldings.avgBuyPrice[currentStock] = null;
+
+      userHoldings.tradeLog.unshift({
+        time: new Date().toLocaleTimeString(),
+        stock: currentStock,
+        type: '매도',
+        price, quantity,
+        total: price * quantity,
+        profit: profit,
+        rate: rate
+      });
+
+      saveData();
+      updateInfo();
+      renderTradeLog();
+    }
+
+    setInterval(() => {
+      stocks.forEach(stock => {
+        const prices = stockData[stock];
+        const newPrice = getRandomPrice(prices[prices.length - 1], stock);
+        prices.push(newPrice);
+        if (prices.length > maxDataLength) prices.shift();
+      });
+
+      data.labels.push((currentIndex++).toString());
+      if (data.labels.length > maxDataLength) data.labels.shift();
+
+      data.datasets[0].data = stockData[currentStock];
+      chart.update();
+      updateInfo();
+    }, 1000);
+
+    function updateInfo() {
+      document.getElementById("cash").innerText = Math.floor(userHoldings.cash).toLocaleString();
+      document.getElementById("shares").innerText = userHoldings.shares[currentStock];
+      document.getElementById("currentPrice").innerText = getCurrentPrice().toLocaleString();
+
+      const shares = userHoldings.shares[currentStock];
+      const avgBuy = userHoldings.avgBuyPrice[currentStock];
+      const current = getCurrentPrice();
+      const profitEl = document.getElementById("profit");
+
+      if (shares > 0 && avgBuy) {
+        const totalBuy = avgBuy * shares;
+        const totalNow = current * shares;
+        const diff = totalNow - totalBuy;
+        const rate = ((diff / totalBuy) * 100).toFixed(2);
+
+        profitEl.innerText = `${diff >= 0 ? '+' : ''}${diff.toLocaleString()}원 (${rate}%)`;
+        profitEl.style.color = diff >= 0 ? 'green' : 'red';
+      } else {
+        profitEl.innerText = "0원 (0%)";
+        profitEl.style.color = "black";
+      }
+    }
+
+    function renderTradeLog() {
+      const tbody = document.querySelector("#tradeLog tbody");
+      tbody.innerHTML = "";
+      userHoldings.tradeLog.forEach(log => {
+        const row = `<tr>
+          <td>${log.time}</td>
+          <td>${log.stock}</td>
+          <td>${log.type}</td>
+          <td>${log.price.toLocaleString()}</td>
+          <td>${log.quantity}</td>
+          <td>${log.total.toLocaleString()}</td>
+          <td>${log.type === "매도" ? log.profit.toLocaleString() : '-'}</td>
+          <td>${log.type === "매도" ? log.rate : '-'}</td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
+    }
+
+    selectStock(currentStock);
+  </script>
+</body>
+</html>
