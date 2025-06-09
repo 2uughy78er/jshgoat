@@ -9,7 +9,6 @@
       font-family: 'Segoe UI', sans-serif;
       background: #f4f7f9;
       padding: 20px;
-      margin: 0;
     }
     h1 {
       text-align: center;
@@ -22,7 +21,7 @@
       transform: translateX(-50%);
       background: #4caf50;
       color: white;
-      padding: 12px 20px;
+      padding: 10px 20px;
       border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.2);
       display: none;
@@ -32,8 +31,8 @@
       background: white;
       border-radius: 12px;
       padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     select, button, input {
       margin: 6px;
@@ -50,19 +49,18 @@
       background-color: #1a5fd1;
     }
     #stockChart {
-      max-width: 100%;
+      width: 100%;
       height: 300px;
     }
     textarea {
       width: 100%;
-      height: 120px;
-      margin-top: 10px;
+      height: 100px;
       border-radius: 8px;
+      margin-top: 10px;
       padding: 8px;
     }
     .summary {
       font-weight: bold;
-      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -72,14 +70,15 @@
   <h1>📊 모의 주식 시뮬레이터</h1>
 
   <div class="panel summary">
-    💰 자산: <span id="cash"></span>원 |
-    총 평가금액: <span id="totalValue"></span>원 |
-    수익률: <span id="roi"></span>%
+    💰 자산: <span id="cash">0</span>원 |
+    총 평가금액: <span id="totalValue">0</span>원 |
+    수익률: <span id="roi">0</span>%
   </div>
 
   <div class="panel">
     <label for="stockSelect">종목 선택:</label>
     <select id="stockSelect"></select>
+    <span id="currentPrice" style="font-weight:bold; margin-left:10px;">현재가: - 원</span><br>
     <input type="number" id="amount" value="1" min="1">
     <button onclick="buyStock()">매수</button>
     <button onclick="sellStock()">매도</button>
@@ -87,232 +86,197 @@
     <button onclick="coverShort()">청산</button>
   </div>
 
-  <div class="panel" id="stockInfo"></div>
-
   <div class="panel">
     <canvas id="stockChart"></canvas>
   </div>
 
   <div class="panel">
-    <h3>📘 거래 로그</h3>
-    <textarea id="logArea" readonly></textarea>
+    <h3>📒 보유 종목 현황</h3>
+    <textarea id="holdings" readonly></textarea>
   </div>
 
   <script>
-    const stocks = [
-      { name: '삼성전자', price: 70000 },
-      { name: 'LG화학', price: 520000 },
-      { name: '현대차', price: 190000 },
-      { name: 'NAVER', price: 250000 },
-      { name: '카카오', price: 115000 },
-      { name: 'SK하이닉스', price: 140000 },
-      { name: '셀트리온', price: 185000 },
-      { name: '포스코', price: 320000 },
-      { name: '한화솔루션', price: 50000 },
-      { name: 'CJ제일제당', price: 350000 },
-      { name: '두산에너빌리티', price: 23000 },
-      { name: 'LG에너지솔루션', price: 420000 },
-      { name: '현대모비스', price: 210000 },
-      { name: '롯데케미칼', price: 190000 },
-      { name: '저가테스트종목', price: 1000 }
-    ];
+    const stocks = {};
+    const chartData = {};
+    const chartInstances = {};
+    const initialCash = 100000;
+    let cash = parseInt(localStorage.getItem('cash')) || initialCash;
+    let holdings = JSON.parse(localStorage.getItem('holdings') || '{}');
+    let shorts = JSON.parse(localStorage.getItem('shorts') || '{}');
+    let selectedStock = null;
 
-    let portfolio = JSON.parse(localStorage.getItem('portfolio')) || {};
-    let cash = parseInt(localStorage.getItem('cash') || "100000");
-    let logs = JSON.parse(localStorage.getItem('logs')) || [];
-    let currentStock = stocks[0].name;
-    let currentChart = null;
-    const chartsData = {};
+    const stockList = ["삼성전자", "현대차", "LG에너지솔루션", "카카오", "네이버", "SK하이닉스", "삼성SDI", "POSCO", "한화솔루션", "셀트리온", "씨젠", "두산에너빌리티", "HMM", "팬오션", "한국전력"];
 
-    function showNotification(msg, color = '#4caf50') {
-      const box = document.getElementById('notification');
-      box.style.background = color;
-      box.innerText = msg;
-      box.style.display = 'block';
-      setTimeout(() => box.style.display = 'none', 3000);
+    stockList.forEach(name => {
+      const savedPrice = parseFloat(localStorage.getItem(`price_${name}`));
+      stocks[name] = savedPrice || Math.floor(Math.random() * 5000) + 1000;
+      chartData[name] = [stocks[name]];
+    });
+
+    const ctx = document.getElementById('stockChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: Array(chartData[stockList[0]].length).fill(''),
+        datasets: [{
+          label: '주가',
+          data: chartData[stockList[0]],
+          borderColor: 'blue',
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+
+    function updateChart(stockName) {
+      chart.data.labels = Array(chartData[stockName].length).fill('');
+      chart.data.datasets[0].data = chartData[stockName];
+      chart.update();
     }
 
-    function saveData() {
-      localStorage.setItem('portfolio', JSON.stringify(portfolio));
-      localStorage.setItem('cash', cash);
-      localStorage.setItem('logs', JSON.stringify(logs));
+    function updateCurrentPriceDisplay() {
+      document.getElementById('currentPrice').innerText = `현재가: ${stocks[selectedStock]} 원`;
     }
 
-    function updateUI() {
+    function updateSelectOptions() {
+      const select = document.getElementById('stockSelect');
+      select.innerHTML = '';
+      stockList.forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      });
+      selectedStock = select.value;
+      updateChart(selectedStock);
+      updateCurrentPriceDisplay();
+    }
+
+    function updateInfo() {
       document.getElementById('cash').innerText = cash.toLocaleString();
       let total = cash;
-      const info = stocks.map(s => {
-        const p = portfolio[s.name] || { quantity: 0, short: 0, logs: [] };
-        const value = p.quantity * s.price - p.short * s.price;
-        total += value;
-        const avg = p.logs.length ? p.logs[p.logs.length - 1].price : 0;
-        const gain = avg ? ((s.price - avg) / avg * 100).toFixed(2) : '0.00';
-        const shortGain = avg ? ((avg - s.price) / avg * 100).toFixed(2) : '0.00';
-        return `<div><b>${s.name}</b> | 보유: ${p.quantity}주 | 숏: ${p.short}주 | 수익률: ${gain}% | 숏 수익률: ${shortGain}%</div>`;
-      }).join('');
-      document.getElementById('stockInfo').innerHTML = info;
-      const roi = (((total - 100000) / 100000) * 100).toFixed(2);
+      for (let stock in holdings) {
+        total += holdings[stock] * stocks[stock];
+      }
+      for (let stock in shorts) {
+        total += (shorts[stock].price - stocks[stock]) * shorts[stock].amount;
+      }
       document.getElementById('totalValue').innerText = total.toLocaleString();
+      const roi = ((total - initialCash) / initialCash * 100).toFixed(2);
       document.getElementById('roi').innerText = roi;
+
+      let text = '';
+      for (let stock in holdings) {
+        text += `${stock}: ${holdings[stock]}주 (평가액: ${(holdings[stock]*stocks[stock]).toLocaleString()}원)\n`;
+      }
+      for (let stock in shorts) {
+        text += `${stock}: 숏 ${shorts[stock].amount}주 @${shorts[stock].price}원\n`;
+      }
+      document.getElementById('holdings').value = text;
     }
 
-    function logAction(text) {
-      logs.push(`[${new Date().toLocaleTimeString()}] ${text}`);
-      document.getElementById('logArea').value = logs.slice(-50).join('\n');
-      saveData();
+    function saveState() {
+      localStorage.setItem('cash', cash);
+      localStorage.setItem('holdings', JSON.stringify(holdings));
+      localStorage.setItem('shorts', JSON.stringify(shorts));
+      stockList.forEach(name => {
+        localStorage.setItem(`price_${name}`, stocks[name]);
+      });
     }
 
     function buyStock() {
-      const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
-      const total = stock.price * amount;
-      if (cash >= total) {
-        cash -= total;
-        if (!portfolio[currentStock]) portfolio[currentStock] = { quantity: 0, short: 0, logs: [] };
-        portfolio[currentStock].quantity += amount;
-        portfolio[currentStock].logs.push({ action: "buy", price: stock.price });
-        logAction(`${currentStock} ${amount}주 매수 @${stock.price}`);
-        showNotification(`${currentStock} ${amount}주 매수 완료`, '#2196f3');
-        updateUI();
+      const cost = stocks[selectedStock] * amount;
+      if (cash >= cost) {
+        cash -= cost;
+        holdings[selectedStock] = (holdings[selectedStock] || 0) + amount;
+        showNotification(`${selectedStock} ${amount}주 매수 완료`);
+        updateInfo();
+        saveState();
       } else {
-        showNotification('💸 잔액이 부족합니다.', '#f44336');
+        alert("잔액 부족");
       }
     }
 
     function sellStock() {
-      const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
-      const p = portfolio[currentStock];
-      if (p && p.quantity >= amount) {
-        cash += stock.price * amount;
-        p.quantity -= amount;
-        p.logs.push({ action: "sell", price: stock.price });
-        logAction(`${currentStock} ${amount}주 매도 @${stock.price}`);
-        showNotification(`${currentStock} ${amount}주 매도 완료`, '#2196f3');
-        updateUI();
+      if ((holdings[selectedStock] || 0) >= amount) {
+        cash += stocks[selectedStock] * amount;
+        holdings[selectedStock] -= amount;
+        if (holdings[selectedStock] === 0) delete holdings[selectedStock];
+        showNotification(`${selectedStock} ${amount}주 매도 완료`);
+        updateInfo();
+        saveState();
       } else {
-        showNotification('❌ 보유 주식이 부족합니다.', '#f44336');
+        alert("보유 주식 부족");
       }
     }
 
     function shortStock() {
-      const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
-      if (!portfolio[currentStock]) portfolio[currentStock] = { quantity: 0, short: 0, logs: [] };
-      portfolio[currentStock].short += amount;
-      cash += stock.price * amount;
-      portfolio[currentStock].logs.push({ action: "short", price: stock.price });
-      logAction(`${currentStock} ${amount}주 숏진입 @${stock.price}`);
-      showNotification(`${currentStock} ${amount}주 숏진입`, '#ff9800');
-      updateUI();
+      shorts[selectedStock] = shorts[selectedStock] || { amount: 0, price: stocks[selectedStock] };
+      if (shorts[selectedStock].amount === 0) {
+        shorts[selectedStock].price = stocks[selectedStock];
+      }
+      shorts[selectedStock].amount += amount;
+      cash += stocks[selectedStock] * amount;
+      showNotification(`${selectedStock} ${amount}주 숏 포지션`);
+      updateInfo();
+      saveState();
     }
 
     function coverShort() {
-      const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
-      const p = portfolio[currentStock];
-      const cost = stock.price * amount;
-      if (p && p.short >= amount && cash >= cost) {
-        p.short -= amount;
-        cash -= cost;
-        p.logs.push({ action: "cover", price: stock.price });
-        logAction(`${currentStock} ${amount}주 숏청산 @${stock.price}`);
-        showNotification(`${currentStock} ${amount}주 숏청산 완료`, '#4caf50');
-        updateUI();
+      if (shorts[selectedStock] && shorts[selectedStock].amount >= amount) {
+        cash -= stocks[selectedStock] * amount;
+        shorts[selectedStock].amount -= amount;
+        if (shorts[selectedStock].amount === 0) delete shorts[selectedStock];
+        showNotification(`${selectedStock} ${amount}주 청산 완료`);
+        updateInfo();
+        saveState();
       } else {
-        showNotification('🚫 숏 포지션이 부족하거나 자금 부족.', '#f44336');
+        alert("청산할 숏 포지션 부족");
       }
     }
 
+    function showNotification(msg) {
+      const box = document.getElementById('notification');
+      box.innerText = msg;
+      box.style.display = 'block';
+      setTimeout(() => { box.style.display = 'none'; }, 2000);
+    }
+
     function updatePrices() {
-      stocks.forEach(s => {
-        const change = (Math.random() - 0.45) * 0.1;
-        s.price = Math.max(1, Math.round(s.price * (1 + change)));
+      stockList.forEach(name => {
+        let change = (Math.random() * 0.1 - 0.05);
+        stocks[name] = Math.max(1, Math.round(stocks[name] * (1 + change)));
+        chartData[name].push(stocks[name]);
+        if (chartData[name].length > 50) chartData[name].shift();
       });
+      if (selectedStock) {
+        updateChart(selectedStock);
+        updateCurrentPriceDisplay();
+      }
+      updateInfo();
+      saveState();
     }
 
-    function initCharts() {
-      stocks.forEach(s => {
-        chartsData[s.name] = { labels: [], data: [] };
-      });
-    }
-
-    function updateChartData() {
-      const now = new Date().toLocaleTimeString();
-      stocks.forEach(s => {
-        const d = chartsData[s.name];
-        d.labels.push(now);
-        d.data.push(s.price);
-        if (d.labels.length > 50) {
-          d.labels.shift();
-          d.data.shift();
-        }
-      });
-    }
-
-    function renderChart(name) {
-      if (currentChart) currentChart.destroy();
-      const ctx = document.getElementById('stockChart').getContext('2d');
-      const data = chartsData[name];
-      currentChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: data.labels,
-          datasets: [{
-            label: name,
-            data: data.data,
-            borderColor: 'green',
-            fill: false
-          }]
-        },
-        options: { animation: false, scales: { y: { beginAtZero: false } } }
-      });
-    }
-
-    document.getElementById('stockSelect').addEventListener('change', (e) => {
-      currentStock = e.target.value;
-      renderChart(currentStock);
+    document.getElementById('stockSelect').addEventListener('change', function () {
+      selectedStock = this.value;
+      updateChart(selectedStock);
+      updateCurrentPriceDisplay();
     });
 
-    setInterval(() => {
-      updatePrices();
-      updateChartData();
-      renderChart(currentStock);
-      updateUI();
-    }, 3000);
-
-    setInterval(() => {
-      const s = stocks[Math.floor(Math.random() * stocks.length)];
-      const drop = Math.random() * 0.3 + 0.7;
-      s.price = Math.max(1, Math.floor(s.price * (1 - drop)));
-      logAction(`${s.name} 폭락 (-${Math.floor(drop * 100)}%)`);
-      showNotification(`${s.name} 주가 폭락! 📉`, '#e53935');
-    }, 100000);
-
-    setInterval(() => {
-      const s = stocks[Math.floor(Math.random() * stocks.length)];
-      const rise = Math.random() * 0.2 + 1;
-      s.price = Math.floor(s.price * (1 + rise));
-      logAction(`${s.name} 폭등 (+${Math.floor(rise * 100)}%)`);
-      showNotification(`${s.name} 주가 폭등! 🚀`, '#43a047');
-    }, 150000);
-
-    function init() {
-      const select = document.getElementById('stockSelect');
-      stocks.forEach(s => {
-        const option = document.createElement('option');
-        option.value = s.name;
-        option.textContent = s.name;
-        select.appendChild(option);
-      });
-      initCharts();
-      updateChartData();
-      renderChart(currentStock);
-      updateUI();
-      document.getElementById('logArea').value = logs.slice(-50).join('\n');
-    }
-
-    init();
+    updateSelectOptions();
+    updateInfo();
+    setInterval(updatePrices, 3000);
   </script>
 </body>
 </html>
