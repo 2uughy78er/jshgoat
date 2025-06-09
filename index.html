@@ -1,31 +1,211 @@
-<div style="display:flex; gap:20px;">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>모의 주식 시뮬레이터</title>
+  <style>
+    body { font-family: Arial; background: #f5f5f5; padding: 20px; }
+    .stock { margin-bottom: 10px; padding: 10px; background: white; border-radius: 8px; box-shadow: 0 0 5px #ccc; }
+    .buttons button { margin-right: 5px; }
+    #portfolio, #history { margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>📈 모의 주식 시뮬레이터</h1>
+  <div id="stocks"></div>
 
-  <!-- 왼쪽: 종목 선택 + 랭킹 + 이름 -->
-  <div style="width:200px; padding:10px; border:1px solid #ccc;">
-    <h3>종목 선택</h3>
-    <div id="stockButtons" style="display:flex; flex-wrap: wrap; gap:5px;">
-      <!-- 종목 버튼들 여기 -->
-    </div>
-    <h3>수익률 순위</h3>
-    <ul id="rankList" style="padding-left:20px; font-size:14px;"></ul>
+  <h2>💼 내 포트폴리오</h2>
+  <div id="portfolio"></div>
 
-    <h3>이름 설정</h3>
-    <input id="userNameInput" type="text" placeholder="이름 입력" style="width:100%; margin-bottom:5px;">
-    <button id="saveNameBtn" style="width:100%;">저장</button>
-  </div>
+  <h2>📜 거래 이력</h2>
+  <div id="history"></div>
 
-  <!-- 오른쪽: 차트 + 거래 -->
-  <div style="flex-grow:1; padding:10px; border:1px solid #ccc;">
-    <h2 id="stock-title">종목명</h2>
-    <div>현재가: <span id="currentPrice">0</span>원</div>
-    <div style="margin:10px 0;">
-      <input id="tradeAmount" type="number" min="1" placeholder="수량" style="width:80px;">
-      <button id="buyBtn">매수</button>
-      <button id="sellBtn">매도</button>
-    </div>
-    <div>보유현금: <span id="cash">0</span>원</div>
-    <div>보유주식: <span id="shares">0</span>주</div>
-    <canvas id="stockChart" style="width:100%; height:200px;"></canvas>
-  </div>
+  <script>
+    const stocks = [
+      { name: '삼성전자', price: 72000 },
+      { name: 'LG화학', price: 540000 },
+      { name: 'NAVER', price: 205000 },
+      { name: '카카오', price: 62000 },
+      { name: '현대차', price: 192000 },
+      { name: '셀트리온', price: 142000 },
+      { name: '한화솔루션', price: 50000 },
+      { name: 'SK하이닉스', price: 126000 },
+      { name: '포스코퓨처엠', price: 310000 },
+      { name: '대한항공', price: 25000 },
+      { name: '두산에너빌리티', price: 18000 },
+      { name: '롯데케미칼', price: 190000 },
+      { name: '하나금융지주', price: 40000 },
+      { name: '신한지주', price: 37000 },
+      { name: '저가주1000', price: 1000 }
+    ];
 
-</div>
+    const updateInterval = 5000;
+    let state = {
+      cash: 100000,
+      prices: {},
+      holdings: {},
+      shorts: {},
+      trades: []
+    };
+
+    function formatNumber(num) {
+      return num.toLocaleString();
+    }
+
+    function saveState() {
+      localStorage.setItem('simState', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const data = localStorage.getItem('simState');
+      if (data) state = JSON.parse(data);
+      else stocks.forEach(s => state.prices[s.name] = s.price);
+    }
+
+    function renderStocks() {
+      const container = document.getElementById('stocks');
+      container.innerHTML = '';
+      stocks.forEach(stock => {
+        const price = state.prices[stock.name];
+        const div = document.createElement('div');
+        div.className = 'stock';
+        div.innerHTML = `
+          <strong>${stock.name}</strong> - ${formatNumber(price)}원
+          <div class="buttons">
+            <button onclick="buy('${stock.name}')">매수</button>
+            <button onclick="sell('${stock.name}')">매도</button>
+            <button onclick="shortSell('${stock.name}')">공매도</button>
+            <button onclick="coverShort('${stock.name}')">숏청산</button>
+          </div>`;
+        container.appendChild(div);
+      });
+    }
+
+    function renderPortfolio() {
+      const container = document.getElementById('portfolio');
+      let html = `현금: ${formatNumber(state.cash)}원<br>`;
+      html += `<table><tr><th>종목</th><th>보유</th><th>공매도</th><th>수익률</th></tr>`;
+      stocks.forEach(stock => {
+        const name = stock.name;
+        const h = state.holdings[name];
+        const s = state.shorts[name];
+        if (h || s) {
+          let pct = '';
+          if (h) {
+            const avg = h.totalCost / h.qty;
+            const now = state.prices[name];
+            pct = (((now - avg) / avg) * 100).toFixed(1) + '%';
+          } else if (s) {
+            const avg = s.totalProceeds / s.qty;
+            const now = state.prices[name];
+            pct = (((avg - now) / avg) * 100).toFixed(1) + '%';
+          }
+          html += `<tr><td>${name}</td><td>${h ? h.qty : 0}</td><td>${s ? s.qty : 0}</td><td>${pct}</td></tr>`;
+        }
+      });
+      html += `</table>`;
+      container.innerHTML = html;
+    }
+
+    function buy(name) {
+      const price = state.prices[name];
+      if (state.cash >= price) {
+        state.cash -= price;
+        if (!state.holdings[name]) state.holdings[name] = { qty: 0, totalCost: 0 };
+        state.holdings[name].qty++;
+        state.holdings[name].totalCost += price;
+        recordTrade('매수', name, price);
+        renderPortfolio(); saveState();
+      }
+    }
+
+    function sell(name) {
+      const h = state.holdings[name];
+      if (h && h.qty > 0) {
+        const price = state.prices[name];
+        const avg = h.totalCost / h.qty;
+        const profit = price - avg;
+        state.cash += price;
+        h.totalCost -= avg;
+        h.qty--;
+        if (h.qty === 0) delete state.holdings[name];
+        recordTrade('매도', name, price, profit);
+        renderPortfolio(); saveState();
+      }
+    }
+
+    function shortSell(name) {
+      const price = state.prices[name];
+      if (!state.shorts[name]) state.shorts[name] = { qty: 0, totalProceeds: 0 };
+      state.shorts[name].qty++;
+      state.shorts[name].totalProceeds += price;
+      state.cash += price;
+      recordTrade('숏(공매도)', name, price);
+      renderPortfolio(); saveState();
+    }
+
+    function coverShort(name) {
+      const s = state.shorts[name];
+      if (s && s.qty > 0) {
+        const price = state.prices[name];
+        const avg = s.totalProceeds / s.qty;
+        const profit = avg - price;
+        state.cash -= price;
+        s.totalProceeds -= avg;
+        s.qty--;
+        if (s.qty === 0) delete state.shorts[name];
+        recordTrade('숏청산', name, price, profit);
+        renderPortfolio(); saveState();
+      }
+    }
+
+    function updatePrices() {
+      stocks.forEach(stock => {
+        const change = (Math.random() * 10 - 5) | 0;
+        state.prices[stock.name] = Math.max(100, state.prices[stock.name] + change);
+      });
+      renderStocks(); renderPortfolio(); saveState();
+    }
+
+    function crashRandomStock() {
+      const target = stocks[Math.floor(Math.random() * stocks.length)].name;
+      const drop = 0.7 + Math.random() * 0.3;
+      state.prices[target] = Math.floor(state.prices[target] * (1 - drop));
+      recordTrade('🔥 폭락 발생', target, state.prices[target]);
+      renderStocks(); renderPortfolio(); saveState();
+    }
+
+    function boomRandomStock() {
+      const target = stocks[Math.floor(Math.random() * stocks.length)].name;
+      const up = 1 + Math.random() * 0.2;
+      state.prices[target] = Math.floor(state.prices[target] * up);
+      recordTrade('🚀 폭등 발생', target, state.prices[target]);
+      renderStocks(); renderPortfolio(); saveState();
+    }
+
+    function recordTrade(type, name, price, result = null) {
+      const now = new Date().toLocaleTimeString();
+      let text = `[${now}] ${type} - ${name} @ ${formatNumber(price)}원`;
+      if (result !== null) {
+        const percent = ((result / price) * 100).toFixed(2);
+        text += ` | 손익: ${formatNumber(result)}원 (${percent}%)`;
+      }
+      state.trades.push(text);
+      updateHistory(); saveState();
+    }
+
+    function updateHistory() {
+      const el = document.getElementById('history');
+      el.innerHTML = state.trades.slice().reverse().map(t => `<div>${t}</div>`).join('');
+    }
+
+    loadState();
+    renderStocks();
+    renderPortfolio();
+    updateHistory();
+    setInterval(updatePrices, updateInterval);
+    setInterval(crashRandomStock, 100000);
+    setInterval(boomRandomStock, 150000);
+  </script>
+</body>
+</html>
