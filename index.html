@@ -5,21 +5,50 @@
   <title>📈 모의 주식 시뮬레이터</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f7f9fb; }
-    h1 { text-align: center; }
-    .panel { background: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f6f9; }
+    h1 { text-align: center; margin-bottom: 30px; }
+    .panel {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      line-height: 1.8;
+      font-size: 16px;
+    }
     #stockChart { width: 100%; height: 300px; }
-    textarea { width: 100%; height: 100px; }
-    button { cursor: pointer; }
+    textarea {
+      width: 100%;
+      height: 100px;
+      font-family: monospace;
+      padding: 10px;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      padding: 6px 12px;
+      margin: 2px;
+      font-size: 14px;
+    }
+    select, input[type="number"] {
+      padding: 6px;
+      font-size: 14px;
+      margin-right: 8px;
+    }
+    .stock-line {
+      border-bottom: 1px solid #eee;
+      padding: 5px 0;
+    }
+    .stock-line:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
   <h1>📈 모의 주식 시뮬레이터</h1>
 
   <div class="panel">
-    💰 자산: <span id="cash"></span>원 |
-    총 평가금액: <span id="totalValue"></span>원 |
-    수익률: <span id="roi"></span>%
+    💰 자산: <strong id="cash"></strong>원 |
+    총 평가금액: <strong id="totalValue"></strong>원 |
+    수익률: <strong id="roi"></strong>%
   </div>
 
   <div class="panel">
@@ -49,21 +78,10 @@
 
   <script>
     const initialPrices = {
-      '삼성전자': 70000,
-      '현대차': 180000,
-      'LG에너지솔루션': 400000,
-      '카카오': 60000,
-      '네이버': 200000,
-      'SK하이닉스': 130000,
-      '삼성SDI': 600000,
-      'POSCO': 350000,
-      '한화솔루션': 50000,
-      '셀트리온': 160000,
-      '씨젠': 30000,
-      '두산에너빌리티': 25000,
-      'HMM': 15000,
-      '팬오션': 10000,
-      '한국전력': 1000
+      '삼성전자': 70000, '현대차': 180000, 'LG에너지솔루션': 400000, '카카오': 60000,
+      '네이버': 200000, 'SK하이닉스': 130000, '삼성SDI': 600000, 'POSCO': 350000,
+      '한화솔루션': 50000, '셀트리온': 160000, '씨젠': 30000, '두산에너빌리티': 25000,
+      'HMM': 15000, '팬오션': 10000, '한국전력': 1000
     };
 
     let prices = JSON.parse(localStorage.getItem('stockPrices')) || structuredClone(initialPrices);
@@ -101,7 +119,7 @@
           total += p.quantity * s.price - p.short * s.price;
         }
 
-        return `<div><b>${s.name}</b> | 현재가: ${s.price.toLocaleString()}원 | 보유: ${p.quantity}주 | 숏: ${p.short}주 | 수익률: ${gain}% | 숏 수익률: ${shortGain}%</div>`;
+        return `<div class="stock-line"><b>${s.name}</b> | 현재가: ${s.price.toLocaleString()}원 | 보유: ${p.quantity}주 | 숏: ${p.short}주 | 수익률: ${gain}% | 숏 수익률: ${shortGain}%</div>`;
       }).join('');
       document.getElementById('stockInfo').innerHTML = info;
       const roi = (((total - 100000) / 100000) * 100).toFixed(2);
@@ -143,20 +161,10 @@
     }
 
     function shortStock() {
-      // 현재 총자산 계산
-      let totalAssets = cash;
-      stocks.forEach(s => {
-        const p = portfolio[s.name];
-        if (p) {
-          totalAssets += (p.quantity - p.short) * s.price;
-        }
-      });
-
-      if (totalAssets >= 0) {
-        alert("⚠️ 자산이 0보다 작을 때만 숏 포지션을 사용할 수 있습니다!");
+      if (cash >= 0) {
+        alert("보유 자산이 0원 이하일 때만 숏 포지션을 잡을 수 있습니다.");
         return;
       }
-
       const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
       if (!portfolio[currentStock]) portfolio[currentStock] = { quantity: 0, short: 0, logs: [] };
