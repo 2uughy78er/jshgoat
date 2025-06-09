@@ -1,176 +1,213 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>실시간 주식 거래 시뮬레이터 (롱/숏 + 폭등/폭락)</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      display: flex;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      height: 100vh;
-    }
-    .sidebar {
-      width: 220px;
-      background: #f5f5f5;
-      padding: 10px;
-      overflow-y: auto;
-      box-sizing: border-box;
-    }
-    .chart-container {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-      box-sizing: border-box;
-    }
-    .stock-list button {
-      display: block;
-      width: 100%;
-      margin-bottom: 5px;
-    }
-    .controls {
-      margin-top: 10px;
-    }
-    .info {
-      margin-top: 10px;
-    }
-    .log-table, .log-table th, .log-table td {
-      border: 1px solid #ccc;
-      border-collapse: collapse;
-    }
-    .log-table th, .log-table td {
-      padding: 5px;
-      text-align: center;
-    }
-    .rankings {
-      margin-top: 20px;
-      font-size: 14px;
-    }
-    .max-buy {
-      margin-top: 5px;
-      font-size: 14px;
-      color: #333;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>주식 시뮬레이터 (롱/숏 + 폭등/폭락 + 차트)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body {
+    display: flex;
+    font-family: Arial, sans-serif;
+    margin: 0; height: 100vh;
+    overflow: hidden;
+  }
+  .sidebar {
+    width: 220px;
+    background: #f0f0f0;
+    padding: 10px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  .sidebar h2 {
+    margin-top: 0;
+  }
+  #stockButtons button {
+    width: 100%;
+    margin-bottom: 5px;
+    padding: 5px;
+    cursor: pointer;
+  }
+  .chart-container {
+    flex-grow: 1;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+  #tradeAmount {
+    width: 80px;
+  }
+  .info {
+    margin-top: 10px;
+  }
+  .log-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+  }
+  .log-table th, .log-table td {
+    border: 1px solid #ccc;
+    padding: 4px 6px;
+    text-align: center;
+  }
+  .rankings ul {
+    padding-left: 20px;
+  }
+</style>
 </head>
 <body>
-  <div class="sidebar">
-    <h2>종목 선택</h2>
-    <div class="stock-list" id="stockButtons"></div>
-    <div class="rankings">
-      <h3>🏆 수익률 순위</h3>
-      <ul id="rankList"></ul>
-    </div>
-    <div style="margin-top:20px;">
-      <label for="userNameInput">사용자 이름:</label><br />
-      <input type="text" id="userNameInput" placeholder="이름 입력" />
-      <button id="setNameBtn">설정</button>
-    </div>
+<div class="sidebar">
+  <h2>종목 선택</h2>
+  <div id="stockButtons"></div>
+  <div class="rankings">
+    <h3>🏆 수익률 순위</h3>
+    <ul id="rankList"></ul>
   </div>
+  <div style="margin-top:20px;">
+    <label for="userNameInput">사용자 이름:</label><br />
+    <input type="text" id="userNameInput" placeholder="이름 입력" />
+    <button id="setNameBtn">설정</button>
+  </div>
+</div>
 
-  <div class="chart-container">
-    <h1 id="stock-title">초기투자</h1>
-    <div style="font-size: 18px; margin-bottom: 15px;">
-      현재 주가: <span id="currentPrice" style="font-weight: bold;">0</span>원
-    </div>
-    <div class="controls">
-      <input type="number" id="tradeAmount" value="1" min="1" />
-      <button onclick="buyStock()">🟢 매수 (롱 진입)</button>
-      <button onclick="sellStock()">🔴 매도 (롱 청산)</button><br /><br />
-      <button onclick="shortSell()">📉 숏매수 (숏 진입)</button>
-      <button onclick="shortBuy()">📈 숏매도 (숏 청산)</button>
-      <div class="max-buy" id="maxBuy"></div>
-      <div class="info">
-        💰 자금: <span id="cash">-</span>원<br />
-        💼 보유 수량: <span id="shares">-</span>개<br />
-        🟠 숏 포지션: <span id="shortShares">-</span>개<br />
-      </div>
-    </div>
-    <canvas id="stockChart" width="1200" height="400"></canvas>
-    <h3>📋 거래 내역</h3>
-    <table class="log-table" id="tradeLog">
-      <thead>
-        <tr>
-          <th>시간</th>
-          <th>종목</th>
-          <th>구분</th>
-          <th>단가</th>
-          <th>수량</th>
-          <th>총액</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+<div class="chart-container">
+  <h1 id="stock-title">초기투자</h1>
+  <div style="font-size:18px; margin-bottom:10px;">
+    현재 주가: <span id="currentPrice">-</span>원
   </div>
+  <div>
+    <input type="number" id="tradeAmount" value="1" min="1" /> 개
+    <button onclick="buyStock()">🟢 롱 매수</button>
+    <button onclick="sellStock()">🔴 롱 매도</button><br /><br />
+    <button onclick="shortSell()">📉 숏 매수 (숏 진입)</button>
+    <button onclick="shortBuy()">📈 숏 매도 (숏 청산)</button>
+  </div>
+  <div class="info">
+    💰 자금: <span id="cash">-</span>원<br />
+    💼 보유 주식: <span id="shares">-</span>개<br />
+    🟠 숏 포지션: <span id="shortShares">-</span>개
+  </div>
+  <canvas id="stockChart" width="900" height="400" style="margin-top:15px;"></canvas>
+
+  <h3>📋 거래 내역</h3>
+  <table class="log-table">
+    <thead>
+      <tr><th>시간</th><th>종목</th><th>구분</th><th>단가</th><th>수량</th><th>총액</th></tr>
+    </thead>
+    <tbody id="tradeLogBody"></tbody>
+  </table>
+</div>
 
 <script>
+  // ====== 기본 데이터 세팅 ======
   const stocks = ['초기투자', '삼성전자', '현대차', 'LG전자', '카카오', '네이버', '셀트리온', 'POSCO', 'SK하이닉스', '기아'];
   const startPrices = {
     '초기투자': 1000, '삼성전자': 60000, '현대차': 220000, 'LG전자': 130000,
     '카카오': 70000, '네이버': 300000, '셀트리온': 250000, 'POSCO': 300000,
     'SK하이닉스': 110000, '기아': 85000
   };
-  const maxDataLength = 50;
   const initialCash = 100000;
+  const maxDataLength = 50;
 
+  let usersData = {}; // { 사용자명: { cash, stocks, shortStocks, trades } }
   let currentUserName = null;
-  let usersData = {};
+
+  let stockData = {}; // 종목별 주가 배열
   let currentStock = stocks[0];
-  let stockData = {};
-  let chart, data;
-  let priceUpdateInterval = null;
 
-  // 폭락, 폭등 카운터
-  let crashCounter = 0;
-  let boomCounter = 0;
+  let chart = null;
+  let secondsPassed = 0;
 
-  // 랜덤 가격 생성 함수
-  function getRandomPrice(prevPrice, isCrash = false, isBoom = false) {
-    let changePercent = 0;
-    if (isCrash) {
-      // 폭락: -90% ~ -100%
-      changePercent = -0.9 - Math.random() * 0.1;
-    } else if (isBoom) {
-      // 폭등: +120% (즉, 2.2배)
-      changePercent = 1.2;
-    } else {
-      // 일반 변동: -0.5% ~ +0.5%
-      changePercent = (Math.random() - 0.5) * 0.01;
+  // 저장 및 불러오기
+  function loadUsersData() {
+    const saved = localStorage.getItem('stockSimData');
+    usersData = saved ? JSON.parse(saved) : {};
+  }
+  function saveUsersData() {
+    localStorage.setItem('stockSimData', JSON.stringify(usersData));
+  }
+  function saveCurrentUser() {
+    if(currentUserName) localStorage.setItem('currentUserName', currentUserName);
+  }
+  function loadCurrentUser() {
+    const savedName = localStorage.getItem('currentUserName');
+    if(savedName) {
+      currentUserName = savedName;
+      if(!usersData[currentUserName]) createNewUser(currentUserName);
+      document.getElementById('userNameInput').value = currentUserName;
+      updateInfo();
+      updateTradeLog();
+      updateRanking();
     }
-    return Math.max(1, Math.round(prevPrice * (1 + changePercent)));
+  }
+  function createNewUser(name) {
+    usersData[name] = {
+      cash: initialCash,
+      stocks: {},
+      shortStocks: {},
+      trades: []
+    };
+    saveUsersData();
   }
 
-  function generateInitialData(startPrice) {
-    const arr = [startPrice];
-    for (let i = 1; i < maxDataLength; i++) {
-      arr.push(getRandomPrice(arr[i - 1]));
+  function generateInitialData(basePrice) {
+    let arr = [basePrice];
+    for(let i=1; i<maxDataLength; i++){
+      arr.push(Math.max(1, Math.round(arr[i-1] * (1 + (Math.random()-0.5)*0.01))));
     }
     return arr;
   }
 
-  function initStockData() {
+  function initStockData(){
     stocks.forEach(stock => {
       stockData[stock] = generateInitialData(startPrices[stock]);
     });
   }
 
+  function createStockButtons(){
+    const container = document.getElementById('stockButtons');
+    container.innerHTML = '';
+    stocks.forEach(stock => {
+      const btn = document.createElement('button');
+      btn.textContent = stock;
+      btn.onclick = () => {
+        currentStock = stock;
+        document.getElementById('stock-title').textContent = currentStock;
+        updateChart();
+        updateInfo();
+      };
+      container.appendChild(btn);
+    });
+  }
+
+  // 주가 업데이트 (30초마다 폭락, 45초마다 폭등, 그 외는 소폭 변동)
   function updateStockPrices() {
-    crashCounter++;
-    boomCounter++;
+    secondsPassed++;
 
-    const isCrash = crashCounter >= 30; // 30초마다 폭락
-    const isBoom = boomCounter >= 45;   // 45초마다 폭등
-
-    if (isCrash) crashCounter = 0;
-    if (isBoom) boomCounter = 0;
+    const isCrash = (secondsPassed % 30 === 0);
+    const isBoom = (secondsPassed % 45 === 0);
 
     stocks.forEach(stock => {
-      const arr = stockData[stock];
-      const prevPrice = arr[arr.length - 1];
-      const newPrice = getRandomPrice(prevPrice, isCrash, isBoom);
-      arr.push(newPrice);
-      if (arr.length > maxDataLength) arr.shift();
+      let prevPrice = stockData[stock][stockData[stock].length - 1];
+      let newPrice;
+
+      if(isCrash) {
+        // 10%~0% 하락 (폭락)
+        newPrice = Math.max(1, Math.round(prevPrice * (0.9 + Math.random() * 0.1)));
+      }
+      else if(isBoom) {
+        // 120% 이상 상승 (2.2배)
+        newPrice = Math.round(prevPrice * 2.2);
+      }
+      else {
+        // ±0.5% 변동 (소폭 상승/하락)
+        newPrice = Math.max(1, Math.round(prevPrice * (1 + (Math.random() - 0.5) * 0.01)));
+      }
+
+      stockData[stock].push(newPrice);
+      if(stockData[stock].length > maxDataLength){
+        stockData[stock].shift();
+      }
     });
 
     updateChart();
@@ -179,10 +216,10 @@
   }
 
   function updateChart() {
-    const labels = stockData[currentStock].map((_, i) => i + 1);
-    const dataPrices = stockData[currentStock];
+    const prices = stockData[currentStock];
+    const labels = prices.map((_,i) => i + 1);
 
-    if (!chart) {
+    if(!chart){
       const ctx = document.getElementById('stockChart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
@@ -190,126 +227,127 @@
           labels: labels,
           datasets: [{
             label: currentStock,
-            data: dataPrices,
+            data: prices,
             borderColor: 'blue',
             backgroundColor: 'rgba(0,0,255,0.1)',
             fill: true,
-            tension: 0.2,
+            tension: 0.3,
+            pointRadius: 0,
           }]
         },
         options: {
           animation: false,
           responsive: true,
           scales: {
-            y: { beginAtZero: false }
+            y: {
+              beginAtZero: false
+            }
+          },
+          plugins: {
+            legend: { display: true }
           }
         }
       });
     } else {
       chart.data.labels = labels;
       chart.data.datasets[0].label = currentStock;
-      chart.data.datasets[0].data = dataPrices;
+      chart.data.datasets[0].data = prices;
       chart.update();
     }
+
+    document.getElementById('currentPrice').textContent = prices[prices.length - 1].toLocaleString();
   }
 
-  function loadUsersData() {
-    const saved = localStorage.getItem('stockSimData');
-    usersData = saved ? JSON.parse(saved) : {};
-  }
-
-  function saveUsersData() {
-    localStorage.setItem('stockSimData', JSON.stringify(usersData));
-  }
-
-  function initCurrentUser(name) {
-    currentUserName = name;
-    localStorage.setItem('currentUserName', name);
-    if (!usersData[name]) {
-      usersData[name] = {
-        cash: initialCash,
-        stocks: {},
-        shortStocks: {},
-        trades: []
-      };
-    }
-    saveUsersData();
-    updateInfo();
-    updateTradeLog();
-    updateRanking();
-  }
-
-  // 롱매수
+  // 롱 매수
   function buyStock() {
+    if(!currentUserName) return alert("사용자 이름을 설정해주세요!");
     const amount = parseInt(document.getElementById('tradeAmount').value);
-    if (isNaN(amount) || amount <= 0) return alert("수량 오류");
-    const price = stockData[currentStock].slice(-1)[0];
+    if(isNaN(amount) || amount <= 0) return alert("수량을 올바르게 입력하세요.");
+    const price = stockData[currentStock][stockData[currentStock].length - 1];
     const totalCost = price * amount;
-    if (usersData[currentUserName].cash < totalCost) return alert("자금 부족");
+
+    if(usersData[currentUserName].cash < totalCost) return alert("자금이 부족합니다.");
 
     usersData[currentUserName].cash -= totalCost;
     usersData[currentUserName].stocks[currentStock] = (usersData[currentUserName].stocks[currentStock] || 0) + amount;
-    usersData[currentUserName].trades.push({ time: new Date().toLocaleTimeString(), stock: currentStock, type: "롱 매수", price, amount, total: totalCost });
+
+    logTrade(currentStock, "롱 매수", price, amount, totalCost);
     saveUsersData();
     updateInfo();
     updateTradeLog();
   }
 
-  // 롱매도
+  // 롱 매도
   function sellStock() {
+    if(!currentUserName) return alert("사용자 이름을 설정해주세요!");
     const amount = parseInt(document.getElementById('tradeAmount').value);
-    if (isNaN(amount) || amount <= 0) return alert("수량 오류");
-    const price = stockData[currentStock].slice(-1)[0];
+    if(isNaN(amount) || amount <= 0) return alert("수량을 올바르게 입력하세요.");
+    const price = stockData[currentStock][stockData[currentStock].length - 1];
     const held = usersData[currentUserName].stocks[currentStock] || 0;
-    if (held < amount) return alert("보유 수량 부족");
+
+    if(held < amount) return alert("보유 주식이 부족합니다.");
 
     usersData[currentUserName].stocks[currentStock] -= amount;
-    const gain = price * amount;
-    usersData[currentUserName].cash += gain;
-    usersData[currentUserName].trades.push({ time: new Date().toLocaleTimeString(), stock: currentStock, type: "롱 매도", price, amount, total: gain });
+    usersData[currentUserName].cash += price * amount;
+
+    logTrade(currentStock, "롱 매도", price, amount, price * amount);
     saveUsersData();
     updateInfo();
     updateTradeLog();
   }
 
-  // 숏매수 (숏 포지션 진입, 주식 빌려서 판 것과 동일, 현금 증가)
+  // 숏 매수 (숏 진입)
   function shortSell() {
+    if(!currentUserName) return alert("사용자 이름을 설정해주세요!");
     const amount = parseInt(document.getElementById('tradeAmount').value);
-    if (isNaN(amount) || amount <= 0) return alert("수량 오류");
-    const price = stockData[currentStock].slice(-1)[0];
+    if(isNaN(amount) || amount <= 0) return alert("수량을 올바르게 입력하세요.");
+    const price = stockData[currentStock][stockData[currentStock].length - 1];
     const totalGain = price * amount;
 
     usersData[currentUserName].cash += totalGain;
     usersData[currentUserName].shortStocks[currentStock] = (usersData[currentUserName].shortStocks[currentStock] || 0) + amount;
-    usersData[currentUserName].trades.push({ time: new Date().toLocaleTimeString(), stock: currentStock, type: "숏 매수 (숏 진입)", price, amount, total: totalGain });
+
+    logTrade(currentStock, "숏 매수 (숏 진입)", price, amount, totalGain);
     saveUsersData();
     updateInfo();
     updateTradeLog();
   }
 
-  // 숏매도 (숏 포지션 청산, 주식 사서 빌린 주식 갚음, 현금 감소)
+  // 숏 매도 (숏 청산)
   function shortBuy() {
+    if(!currentUserName) return alert("사용자 이름을 설정해주세요!");
     const amount = parseInt(document.getElementById('tradeAmount').value);
-    if (isNaN(amount) || amount <= 0) return alert("수량 오류");
-    const price = stockData[currentStock].slice(-1)[0];
+    if(isNaN(amount) || amount <= 0) return alert("수량을 올바르게 입력하세요.");
+    const price = stockData[currentStock][stockData[currentStock].length - 1];
     const heldShort = usersData[currentUserName].shortStocks[currentStock] || 0;
-    if (heldShort < amount) return alert("숏 포지션 부족");
 
+    if(heldShort < amount) return alert("숏 포지션이 부족합니다.");
     const totalCost = price * amount;
-    if (usersData[currentUserName].cash < totalCost) return alert("자금 부족");
+    if(usersData[currentUserName].cash < totalCost) return alert("자금이 부족합니다.");
 
     usersData[currentUserName].cash -= totalCost;
     usersData[currentUserName].shortStocks[currentStock] -= amount;
-    usersData[currentUserName].trades.push({ time: new Date().toLocaleTimeString(), stock: currentStock, type: "숏 매도 (숏 청산)", price, amount, total: totalCost });
+
+    logTrade(currentStock, "숏 매도 (숏 청산)", price, amount, totalCost);
     saveUsersData();
     updateInfo();
     updateTradeLog();
   }
 
+  // 거래 내역 기록
+  function logTrade(stock, type, price, amount, total) {
+    const time = new Date().toLocaleTimeString();
+    usersData[currentUserName].trades.push({ time, stock, type, price, amount, total });
+    if(usersData[currentUserName].trades.length > 100) {
+      usersData[currentUserName].trades.shift();
+    }
+  }
+
   function updateTradeLog() {
-    const logBody = document.getElementById('tradeLog').querySelector('tbody');
-    logBody.innerHTML = "";
-    usersData[currentUserName].trades.slice().reverse().forEach(trade => {
+    const tbody = document.getElementById('tradeLogBody');
+    tbody.innerHTML = '';
+    const trades = usersData[currentUserName]?.trades || [];
+    trades.slice().reverse().forEach(trade => {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${trade.time}</td>
@@ -319,15 +357,73 @@
         <td>${trade.amount}</td>
         <td>${trade.total.toLocaleString()}</td>
       `;
-      logBody.appendChild(row);
+      tbody.appendChild(row);
     });
   }
 
+  // 사용자 정보 업데이트
   function updateInfo() {
-    document.getElementById('cash').textContent = usersData[currentUserName].cash.toLocaleString();
-    const price = stockData[currentStock].slice(-1)[0];
-    const shares = usersData[currentUserName].stocks[currentStock] || 0;
-    const shortShares = usersData[currentUserName].shortStocks[currentStock] || 0;
-    document.getElementById('shares').textContent = shares;
-    document.getElementById('shortShares').textContent = shortShares;
-    document.getElementById('currentPrice').textContent =
+    if (!currentUserName) return;
+    const user = usersData[currentUserName];
+    document.getElementById('cash').textContent = user.cash.toLocaleString();
+    document.getElementById('shares').textContent = user.stocks[currentStock] || 0;
+    document.getElementById('shortShares').textContent = user.shortStocks[currentStock] || 0;
+  }
+
+  // 수익률 계산
+  function calculateProfitRate(user) {
+    let assets = user.cash;
+    for (const stock in user.stocks) {
+      const amount = user.stocks[stock];
+      const price = stockData[stock]?.[stockData[stock].length - 1] || 0;
+      assets += amount * price;
+    }
+    for (const stock in user.shortStocks) {
+      const amount = user.shortStocks[stock];
+      const price = stockData[stock]?.[stockData[stock].length - 1] || 0;
+      assets -= amount * price;
+    }
+    return ((assets - initialCash) / initialCash) * 100;
+  }
+
+  // 순위 업데이트
+  function updateRanking() {
+    const ranking = [];
+    for (const name in usersData) {
+      const profit = calculateProfitRate(usersData[name]);
+      ranking.push({ name, profit });
+    }
+    ranking.sort((a, b) => b.profit - a.profit);
+    const ul = document.getElementById('rankList');
+    ul.innerHTML = '';
+    ranking.forEach((user, index) => {
+      const li = document.createElement('li');
+      li.textContent = `${index + 1}. ${user.name}: ${user.profit.toFixed(2)}%`;
+      ul.appendChild(li);
+    });
+  }
+
+  // 사용자 이름 설정
+  document.getElementById('setNameBtn').onclick = () => {
+    const name = document.getElementById('userNameInput').value.trim();
+    if (!name) return alert("이름을 입력해주세요.");
+    currentUserName = name;
+    if (!usersData[currentUserName]) {
+      createNewUser(currentUserName);
+    }
+    saveCurrentUser();
+    updateInfo();
+    updateTradeLog();
+    updateRanking();
+  };
+
+  // ====== 초기화 ======
+  loadUsersData();
+  initStockData();
+  createStockButtons();
+  loadCurrentUser();
+  updateChart();
+  setInterval(updateStockPrices, 1000); // 1초마다 주가 업데이트
+</script>
+</body>
+</html>
