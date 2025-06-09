@@ -169,7 +169,7 @@
 
     // 랜덤 가격 생성 함수
     function getRandomPrice(prevPrice) {
-      const changePercent = (Math.random() - 0.45) * 0.1; // -5% ~ +5%
+      const changePercent = (Math.random() - 0.5) * 0.1; // -5% ~ +5%
       const newPrice = prevPrice * (1 + changePercent);
       return Math.max(1, Math.round(newPrice));
     }
