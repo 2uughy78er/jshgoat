@@ -223,21 +223,34 @@
     }
 
     function updateUI() {
-      document.getElementById('cash').textContent = cash.toLocaleString();
-      let total = cash;
-      const info = stocks.map(s => {
-        const p = portfolio[s.name] || { quantity: 0, short: 0, shortPrice: 0, logs: [] };
-        const holdingValue = p.quantity * s.price;
-        const shortProfit = p.short > 0 ? (p.shortPrice - s.price) * p.short : 0;
-        total += holdingValue + shortProfit;
+  document.getElementById('cash').textContent = cash.toLocaleString();
+  let total = cash;
+  const info = stocks.map(s => {
+    const p = portfolio[s.name] || { quantity: 0, short: 0, shortPrice: 0, logs: [] };
+    const holdingValue = p.quantity * s.price;
+    const shortProfit = p.short > 0 ? (p.shortPrice - s.price) * p.short : 0;
+    total += holdingValue + shortProfit;
 
-        return `<div><b>${s.name}</b> | 현재가: ${s.price.toLocaleString()}원 | 보유: ${p.quantity}주 | 숏: ${p.short}주 @${p.shortPrice || 0} | 숏이익: ${shortProfit.toLocaleString()}원</div>`;
-      }).join('');
-      document.getElementById('stockInfo').innerHTML = info;
-      const roi = (((total - 100000) / 100000) * 100).toFixed(2);
-      document.getElementById('totalValue').textContent = total.toLocaleString();
-      document.getElementById('roi').textContent = roi;
+    // 평균 매수 가격 계산
+    const buyLogs = (p.logs || []).filter(l => l.action === "buy");
+    const totalBuyCost = buyLogs.reduce((sum, l) => sum + l.price, 0);
+    const avgBuyPrice = buyLogs.length > 0 ? Math.round(totalBuyCost / buyLogs.length) : 0;
+
+    // 수익률 계산
+    let roiText = "";
+    if (p.quantity > 0 && avgBuyPrice > 0) {
+      const roi = (((s.price - avgBuyPrice) / avgBuyPrice) * 100).toFixed(2);
+      roiText = ` | 수익률: ${roi}%`;
     }
+
+    return `<div><b>${s.name}</b> | 현재가: ${s.price.toLocaleString()}원 | 보유: ${p.quantity}주 @${avgBuyPrice}원${roiText} | 숏: ${p.short}주 @${p.shortPrice || 0} | 숏이익: ${shortProfit.toLocaleString()}원</div>`;
+  }).join('');
+  document.getElementById('stockInfo').innerHTML = info;
+  const roi = (((total - 100000) / 100000) * 100).toFixed(2);
+  document.getElementById('totalValue').textContent = total.toLocaleString();
+  document.getElementById('roi').textContent = roi;
+}
+
 
     function logAction(msg) {
       logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
