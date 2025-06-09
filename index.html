@@ -476,16 +476,30 @@
       });
     }
 
-    // 이름 설정 버튼 이벤트
+// 이름 설정 버튼 이벤트
     setNameBtn.onclick = () => {
       const name = userNameInput.value.trim();
-      if (!name) return alert("이름을 입력하세요.");
-      if (name.includes('|')) return alert("이름에 '|' 문자는 사용할 수 없습니다.");
-
+      if (!name) return alert("이름을 입력해주세요.");
       initCurrentUser(name);
-      alert("이름이 설정되었습니다.");
+    };
 
-      // 타이머가 이미 돌고 있으면 종료 후 재시작 (중복방지)
+    // 초기 실행
+    window.onload = () => {
+      initStockData();
+      createStockButtons();
+      initChart();
+      loadUsersData();
+
+      const savedName = localStorage.getItem("currentUserName");
+      if (savedName) {
+        initCurrentUser(savedName);
+      }
+
+      selectStock(currentStock);
+      priceUpdateInterval = setInterval(updateStockPrices, 1000);
+    };
+
+   // 타이머가 이미 돌고 있으면 종료 후 재시작 (중복방지)
       if (priceUpdateInterval) clearInterval(priceUpdateInterval);
       priceUpdateInterval = setInterval(() => {
         updateStockPrices();
