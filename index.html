@@ -5,28 +5,8 @@
   <title>📈 모의 주식 시뮬레이터</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f4f7f9;
-      padding: 20px;
-    }
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-    #notification {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #4caf50;
-      color: white;
-      padding: 10px 20px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-      display: none;
-      z-index: 1000;
-    }
+    body { font-family: sans-serif; background: #f4f7f9; padding: 20px; }
+    h1 { text-align: center; }
     .panel {
       background: white;
       border-radius: 12px;
@@ -45,23 +25,27 @@
       color: white;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #1a5fd1;
-    }
-    #stockChart {
-      width: 100%;
-      height: 300px;
-    }
+    button:hover { background-color: #1a5fd1; }
     textarea {
       width: 100%;
-      height: 100px;
+      height: 120px;
       border-radius: 8px;
       margin-top: 10px;
       padding: 8px;
     }
-    .summary {
-      font-weight: bold;
+    #notification {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      display: none;
+      z-index: 1000;
     }
+    #stockChart { width: 100%; height: 300px; }
   </style>
 </head>
 <body>
@@ -69,10 +53,11 @@
 
   <h1>📊 모의 주식 시뮬레이터</h1>
 
-  <div class="panel summary">
+  <div class="panel">
     💰 자산: <span id="cash">0</span>원 |
     총 평가금액: <span id="totalValue">0</span>원 |
-    수익률: <span id="roi">0</span>%
+    수익률: <span id="roi">0</span>% |
+    손익: <span id="profitLoss">0</span>원
   </div>
 
   <div class="panel">
@@ -91,21 +76,17 @@
   </div>
 
   <div class="panel">
-    <h3>📒 보유 종목 현황</h3>
+    <h3>📒 보유 종목 및 숏 포지션</h3>
     <textarea id="holdings" readonly></textarea>
   </div>
 
   <script>
-    const stocks = {};
-    const chartData = {};
-    const chartInstances = {};
-    const initialCash = 100000;
-    let cash = parseInt(localStorage.getItem('cash')) || initialCash;
+    const stockList = ["삼성전자", "현대차", "LG에너지솔루션", "카카오", "네이버", "SK하이닉스", "삼성SDI", "POSCO", "한화솔루션", "셀트리온", "씨젠", "두산에너빌리티", "HMM", "팬오션", "한국전력"];
+    const stocks = {}, chartData = {};
+    let cash = parseInt(localStorage.getItem('cash')) || 100000;
     let holdings = JSON.parse(localStorage.getItem('holdings') || '{}');
     let shorts = JSON.parse(localStorage.getItem('shorts') || '{}');
     let selectedStock = null;
-
-    const stockList = ["삼성전자", "현대차", "LG에너지솔루션", "카카오", "네이버", "SK하이닉스", "삼성SDI", "POSCO", "한화솔루션", "셀트리온", "씨젠", "두산에너빌리티", "HMM", "팬오션", "한국전력"];
 
     stockList.forEach(name => {
       const savedPrice = parseFloat(localStorage.getItem(`price_${name}`));
@@ -141,10 +122,6 @@
       chart.update();
     }
 
-    function updateCurrentPriceDisplay() {
-      document.getElementById('currentPrice').innerText = `현재가: ${stocks[selectedStock]} 원`;
-    }
-
     function updateSelectOptions() {
       const select = document.getElementById('stockSelect');
       select.innerHTML = '';
@@ -159,18 +136,25 @@
       updateCurrentPriceDisplay();
     }
 
+    function updateCurrentPriceDisplay() {
+      document.getElementById('currentPrice').innerText = `현재가: ${stocks[selectedStock]} 원`;
+    }
+
     function updateInfo() {
       document.getElementById('cash').innerText = cash.toLocaleString();
-      let total = cash;
+      let total = cash, profit = 0;
       for (let stock in holdings) {
         total += holdings[stock] * stocks[stock];
       }
       for (let stock in shorts) {
-        total += (shorts[stock].price - stocks[stock]) * shorts[stock].amount;
+        const diff = shorts[stock].price - stocks[stock];
+        profit += diff * shorts[stock].amount;
+        total += diff * shorts[stock].amount;
       }
       document.getElementById('totalValue').innerText = total.toLocaleString();
-      const roi = ((total - initialCash) / initialCash * 100).toFixed(2);
+      const roi = ((total - 100000) / 100000 * 100).toFixed(2);
       document.getElementById('roi').innerText = roi;
+      document.getElementById('profitLoss').innerText = (total - 100000).toLocaleString();
 
       let text = '';
       for (let stock in holdings) {
@@ -186,9 +170,7 @@
       localStorage.setItem('cash', cash);
       localStorage.setItem('holdings', JSON.stringify(holdings));
       localStorage.setItem('shorts', JSON.stringify(shorts));
-      stockList.forEach(name => {
-        localStorage.setItem(`price_${name}`, stocks[name]);
-      });
+      stockList.forEach(name => localStorage.setItem(`price_${name}`, stocks[name]));
     }
 
     function buyStock() {
@@ -197,12 +179,10 @@
       if (cash >= cost) {
         cash -= cost;
         holdings[selectedStock] = (holdings[selectedStock] || 0) + amount;
-        showNotification(`${selectedStock} ${amount}주 매수 완료`);
+        showNotification(`${selectedStock} ${amount}주 매수`);
         updateInfo();
         saveState();
-      } else {
-        alert("잔액 부족");
-      }
+      } else alert("잔액 부족");
     }
 
     function sellStock() {
@@ -211,23 +191,19 @@
         cash += stocks[selectedStock] * amount;
         holdings[selectedStock] -= amount;
         if (holdings[selectedStock] === 0) delete holdings[selectedStock];
-        showNotification(`${selectedStock} ${amount}주 매도 완료`);
+        showNotification(`${selectedStock} ${amount}주 매도`);
         updateInfo();
         saveState();
-      } else {
-        alert("보유 주식 부족");
-      }
+      } else alert("보유 주식 부족");
     }
 
     function shortStock() {
       const amount = parseInt(document.getElementById('amount').value);
       shorts[selectedStock] = shorts[selectedStock] || { amount: 0, price: stocks[selectedStock] };
-      if (shorts[selectedStock].amount === 0) {
-        shorts[selectedStock].price = stocks[selectedStock];
-      }
+      if (shorts[selectedStock].amount === 0) shorts[selectedStock].price = stocks[selectedStock];
       shorts[selectedStock].amount += amount;
       cash += stocks[selectedStock] * amount;
-      showNotification(`${selectedStock} ${amount}주 숏 포지션`);
+      showNotification(`${selectedStock} ${amount}주 숏`);
       updateInfo();
       saveState();
     }
@@ -238,12 +214,10 @@
         cash -= stocks[selectedStock] * amount;
         shorts[selectedStock].amount -= amount;
         if (shorts[selectedStock].amount === 0) delete shorts[selectedStock];
-        showNotification(`${selectedStock} ${amount}주 청산 완료`);
+        showNotification(`${selectedStock} ${amount}주 청산`);
         updateInfo();
         saveState();
-      } else {
-        alert("청산할 숏 포지션 부족");
-      }
+      } else alert("청산할 숏 부족");
     }
 
     function showNotification(msg) {
@@ -255,19 +229,42 @@
 
     function updatePrices() {
       stockList.forEach(name => {
-        let change = (Math.random() * 0.1 - 0.05);
+        let change = (Math.random() * 0.1 - 0.05); // -5% ~ +5%
         stocks[name] = Math.max(1, Math.round(stocks[name] * (1 + change)));
         chartData[name].push(stocks[name]);
         if (chartData[name].length > 50) chartData[name].shift();
       });
-      if (selectedStock) {
-        updateChart(selectedStock);
-        updateCurrentPriceDisplay();
-      }
+      updateChart(selectedStock);
+      updateCurrentPriceDisplay();
       updateInfo();
       saveState();
     }
 
+    function triggerCrash() {
+      const target = stockList[Math.floor(Math.random() * stockList.length)];
+      const rate = 1 - (Math.random() * 0.3 + 0.7); // -70% ~ -100%
+      stocks[target] = Math.max(1, Math.round(stocks[target] * rate));
+      chartData[target].push(stocks[target]);
+      if (chartData[target].length > 50) chartData[target].shift();
+      showNotification(`${target} 폭락 발생!`);
+      if (target === selectedStock) updateChart(target);
+      updateInfo();
+      saveState();
+    }
+
+    function triggerBoom() {
+      const target = stockList[Math.floor(Math.random() * stockList.length)];
+      const rate = 1 + (Math.random() * 0.2 + 1); // +100% ~ +120%
+      stocks[target] = Math.round(stocks[target] * rate);
+      chartData[target].push(stocks[target]);
+      if (chartData[target].length > 50) chartData[target].shift();
+      showNotification(`${target} 폭등 발생!`);
+      if (target === selectedStock) updateChart(target);
+      updateInfo();
+      saveState();
+    }
+
+    // 초기화
     document.getElementById('stockSelect').addEventListener('change', function () {
       selectedStock = this.value;
       updateChart(selectedStock);
@@ -277,6 +274,8 @@
     updateSelectOptions();
     updateInfo();
     setInterval(updatePrices, 3000);
+    setInterval(triggerCrash, 100000); // 100초마다 폭락
+    setInterval(triggerBoom, 150000);  // 150초마다 폭등
   </script>
 </body>
 </html>
