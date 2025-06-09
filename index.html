@@ -169,7 +169,7 @@
 
     // 랜덤 가격 생성 함수
     function getRandomPrice(prevPrice) {
-      const changePercent = (Math.random() - 0.45) * 0.06; // -2.5% ~ +3.5%
+      const changePercent = (Math.random() - 0.45) * 0.3; // -15% ~ +15%
       const newPrice = prevPrice * (1 + changePercent);
       return Math.max(1, Math.round(newPrice));
     }
@@ -528,8 +528,8 @@ function init() {
   selectStock(currentStock);
 
   setInterval(updateStockPrices, 1000);       // 일반 업데이트
-  setInterval(triggerCrash, 100000);          // ✅ 100초마다 폭락
-  setInterval(triggerBoom, 150000);           // ✅ 150초마다 폭등
+  // setInterval(triggerCrash, 100000);       // ✅ 100초마다 폭락 (제거됨)
+  // setInterval(triggerBoom, 150000);        // ✅ 150초마다 폭등 (제거됨)
   setInterval(updateHoldingsDisplay, 3000);   // 보유 수량 갱신
 }
     init();
