@@ -285,20 +285,22 @@
       updateUI();
     }, 3000);
 
+    // 폭락: 70% ~ 100% 하락
     setInterval(() => {
       const s = stocks[Math.floor(Math.random() * stocks.length)];
-      const drop = Math.random() * 0.3 + 0.7;
-      s.price = Math.max(1, Math.floor(s.price * (1 - drop)));
-      logAction(`${s.name} 폭락 (-${Math.floor(drop * 100)}%)`);
-      showNotification(`${s.name} 📉 주가 폭락!`, '#e53935');
+      const dropPercent = Math.random() * 0.3 + 0.7;
+      s.price = Math.max(1, Math.floor(s.price * (1 - dropPercent)));
+      logAction(`${s.name} 폭락 (-${Math.floor(dropPercent * 100)}%)`);
+      showNotification(`${s.name} 📉 주가 폭락! (-${Math.floor(dropPercent * 100)}%)`, '#e53935');
     }, 100000);
 
+    // 폭등: 100% ~ 120% 상승
     setInterval(() => {
       const s = stocks[Math.floor(Math.random() * stocks.length)];
-      const rise = Math.random() * 0.2 + 1;
-      s.price = Math.floor(s.price * (1 + rise));
-      logAction(`${s.name} 폭등 (+${Math.floor(rise * 100)}%)`);
-      showNotification(`${s.name} 🚀 주가 폭등!`, '#43a047');
+      const risePercent = Math.random() * 0.2 + 1.0;
+      s.price = Math.floor(s.price * (1 + risePercent));
+      logAction(`${s.name} 폭등 (+${Math.floor(risePercent * 100)}%)`);
+      showNotification(`${s.name} 🚀 주가 폭등! (+${Math.floor(risePercent * 100)}%)`, '#43a047');
     }, 150000);
 
     function init() {
