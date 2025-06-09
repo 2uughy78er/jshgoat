@@ -245,3 +245,34 @@
         btn.onclick = () => selectStock(stock);
         stockButtonsDiv.appendChild(btn);
       });
+<script>
+  // 기존 스크립트 끝부분에 이어서 넣으세요
+
+  // 모든 종목 가격 70% 폭락
+  function triggerMassCrash() {
+    stocks.forEach(stock => {
+      const lastPrice = stockData[stock][stockData[stock].length - 1];
+      const newPrice = Math.max(1, Math.round(lastPrice * 0.3));
+      stockData[stock].push(newPrice);
+      if (stockData[stock].length > maxDataLength) stockData[stock].shift();
+    });
+    if (currentStock) updateChart(currentStock);
+    console.log('⚠️ 전체 종목 70% 폭락 발생!');
+  }
+
+  // 모든 종목 가격 120% 폭등
+  function triggerMassBoom() {
+    stocks.forEach(stock => {
+      const lastPrice = stockData[stock][stockData[stock].length - 1];
+      const newPrice = Math.round(lastPrice * 2.2);
+      stockData[stock].push(newPrice);
+      if (stockData[stock].length > maxDataLength) stockData[stock].shift();
+    });
+    if (currentStock) updateChart(currentStock);
+    console.log('🚀 전체 종목 120% 폭등 발생!');
+  }
+
+  // 일정 시간마다 자동 발생 (100초마다 폭락, 150초마다 폭등)
+  setInterval(triggerMassCrash, 100000);  // 100,000ms = 100초
+  setInterval(triggerMassBoom, 150000);   // 150,000ms = 150초
+</script>
