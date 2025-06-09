@@ -1,217 +1,31 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <title>주식 시뮬레이터</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { display: flex; padding: 20px; font-family: sans-serif; gap: 20px; }
-    .left, .right { flex: 1; }
-    .right { height: 95vh; overflow-y: auto; display: flex; flex-direction: column; }
-    canvas { max-width: 100%; height: 300px; }
-    button.stock-btn { margin: 2px; padding: 6px 12px; border: 1px solid #ccc; background: #f0f0f0; cursor: pointer; }
-    button.stock-btn:hover { background: #e0e0e0; }
-    #stockButtons { display: flex; flex-wrap: wrap; margin-bottom: 10px; gap: 4px; }
-    #stockHoldings { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; }
-    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 4px 8px; }
-  </style>
-</head>
-<body>
-  <div class="left">
-    <h2>주식 시뮬레이터</h2>
-    <p>이름: <input id="username" placeholder="이름 입력" /></p>
-    <p>자금: <span id="money">-</span>원</p>
-    <p>총 자산: <span id="net">-</span>원</p>
+<div style="display:flex; gap:20px;">
 
-    <h3>거래</h3>
-    <select id="tradeStock"></select>
-    <input type="number" id="tradeAmount" value="1" min="1" />
-    <select id="tradeType">
-      <option value="buy">매수 (Long)</option>
-      <option value="sell">매도 (Long)</option>
-      <option value="short">공매도 (Short)</option>
-      <option value="cover">숏 청산 (Short)</option>
-    </select>
-    <button onclick="trade()">거래 실행</button>
+  <!-- 왼쪽: 종목 선택 + 랭킹 + 이름 -->
+  <div style="width:200px; padding:10px; border:1px solid #ccc;">
+    <h3>종목 선택</h3>
+    <div id="stockButtons" style="display:flex; flex-wrap: wrap; gap:5px;">
+      <!-- 종목 버튼들 여기 -->
+    </div>
+    <h3>수익률 순위</h3>
+    <ul id="rankList" style="padding-left:20px; font-size:14px;"></ul>
 
-    <h3>수익률 랭킹</h3>
-    <table id="ranking"><thead><tr><th>이름</th><th>수익률</th></tr></thead><tbody></tbody></table>
+    <h3>이름 설정</h3>
+    <input id="userNameInput" type="text" placeholder="이름 입력" style="width:100%; margin-bottom:5px;">
+    <button id="saveNameBtn" style="width:100%;">저장</button>
   </div>
 
-  <div class="right">
-    <div id="stockButtons"></div>
-    <div id="chartContainer"><canvas id="stockChart"></canvas></div>
-    <div id="stockHoldings"><h3>보유 종목</h3></div>
+  <!-- 오른쪽: 차트 + 거래 -->
+  <div style="flex-grow:1; padding:10px; border:1px solid #ccc;">
+    <h2 id="stock-title">종목명</h2>
+    <div>현재가: <span id="currentPrice">0</span>원</div>
+    <div style="margin:10px 0;">
+      <input id="tradeAmount" type="number" min="1" placeholder="수량" style="width:80px;">
+      <button id="buyBtn">매수</button>
+      <button id="sellBtn">매도</button>
+    </div>
+    <div>보유현금: <span id="cash">0</span>원</div>
+    <div>보유주식: <span id="shares">0</span>주</div>
+    <canvas id="stockChart" style="width:100%; height:200px;"></canvas>
   </div>
 
-  <script>
-    const stockList = [
-      "삼성전자", "현대차", "네이버", "카카오", "LG화학",
-      "셀트리온", "한화솔루션", "SK하이닉스", "POSCO", "두산에너빌리티",
-      "한미약품", "FIRE1000", "BOMB1000", "HOPE1000", "DOGE1000"
-    ];
-    const prices = {}, holdings = {}, shorts = {}, priceHistories = {};
-    let money = 100000, currentStock = stockList[0], chart;
-
-    let username = localStorage.getItem("sim_name") || "";
-    if (username) document.getElementById("username").value = username;
-    document.getElementById("username").addEventListener("change", () => {
-      username = document.getElementById("username").value;
-      localStorage.setItem("sim_name", username);
-      saveState();
-    });
-
-    function init() {
-      stockList.forEach(name => {
-        prices[name] = name.includes("1000") ? 1000 : Math.floor(Math.random() * 10000 + 10000);
-        holdings[name] = 0;
-        shorts[name] = 0;
-        priceHistories[name] = [prices[name]];
-      });
-      loadState();
-      updateTradeSelect();
-      renderStockButtons();
-      renderChart(currentStock);
-      updateDisplay();
-    }
-
-    function updateTradeSelect() {
-      const sel = document.getElementById("tradeStock");
-      stockList.forEach(name => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.innerText = name;
-        sel.appendChild(opt);
-      });
-    }
-
-    function renderStockButtons() {
-      const container = document.getElementById("stockButtons");
-      stockList.forEach(name => {
-        const btn = document.createElement("button");
-        btn.innerText = name;
-        btn.className = "stock-btn";
-        btn.onclick = () => {
-          currentStock = name;
-          renderChart(name);
-        };
-        container.appendChild(btn);
-      });
-    }
-
-    function renderChart(name) {
-      const ctx = document.getElementById("stockChart").getContext("2d");
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: priceHistories[name].map((_, i) => i),
-          datasets: [{
-            label: name,
-            data: priceHistories[name],
-            borderColor: "blue",
-            fill: false
-          }]
-        },
-        options: {
-          responsive: true,
-          animation: false,
-          scales: { x: { display: false }, y: { beginAtZero: false } }
-        }
-      });
-    }
-
-    function updatePrices() {
-      for (const name of stockList) {
-        const price = prices[name];
-        const change = price * (Math.random() * 0.02 - 0.003);
-        prices[name] = Math.max(10, Math.floor(price + change));
-        priceHistories[name].push(prices[name]);
-        if (priceHistories[name].length > 50) priceHistories[name].shift();
-      }
-      renderChart(currentStock);
-      updateDisplay();
-    }
-
-    function updateDisplay() {
-      document.getElementById("money").innerText = money.toLocaleString();
-      document.getElementById("net").innerText = calcNetWorth().toLocaleString();
-      const div = document.getElementById("stockHoldings");
-      div.innerHTML = "<h3>보유 종목</h3>";
-      stockList.forEach(name => {
-        div.innerHTML += `<p>${name}: ${holdings[name]}주 / 숏: ${shorts[name]}주</p>`;
-      });
-      updateRanking();
-    }
-
-    function trade() {
-      const name = document.getElementById("tradeStock").value;
-      const amount = parseInt(document.getElementById("tradeAmount").value);
-      const type = document.getElementById("tradeType").value;
-      const price = prices[name];
-      if (!username || amount <= 0) return alert("이름 입력 및 수량 확인");
-
-      if (type === "buy" && money >= amount * price) {
-        money -= amount * price;
-        holdings[name] += amount;
-      } else if (type === "sell" && holdings[name] >= amount) {
-        money += amount * price;
-        holdings[name] -= amount;
-      } else if (type === "short") {
-        money += amount * price;
-        shorts[name] += amount;
-      } else if (type === "cover" && shorts[name] >= amount && money >= amount * price) {
-        money -= amount * price;
-        shorts[name] -= amount;
-      }
-      saveState();
-      updateDisplay();
-    }
-
-    function calcNetWorth() {
-      let total = money;
-      stockList.forEach(name => {
-        total += holdings[name] * prices[name];
-        total -= shorts[name] * prices[name];
-      });
-      return total;
-    }
-
-    function updateRanking() {
-      const data = JSON.parse(localStorage.getItem("sim_ranking") || "{}");
-      data[username] = calcNetWorth();
-      localStorage.setItem("sim_ranking", JSON.stringify(data));
-      const tbody = document.querySelector("#ranking tbody");
-      tbody.innerHTML = "";
-      const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-      for (const [name, net] of sorted) {
-        const tr = document.createElement("tr");
-        const pct = ((net - 100000) / 100000 * 100).toFixed(2);
-        tr.innerHTML = `<td>${name}</td><td>${pct}%</td>`;
-        tbody.appendChild(tr);
-      }
-    }
-
-    function saveState() {
-      localStorage.setItem("sim_money", money);
-      localStorage.setItem("sim_holdings", JSON.stringify(holdings));
-      localStorage.setItem("sim_shorts", JSON.stringify(shorts));
-    }
-
-    function loadState() {
-      money = parseInt(localStorage.getItem("sim_money") || "100000");
-      Object.assign(holdings, JSON.parse(localStorage.getItem("sim_holdings") || "{}"));
-      Object.assign(shorts, JSON.parse(localStorage.getItem("sim_shorts") || "{}"));
-    }
-
-    init();
-    setInterval(updatePrices, 2000);
-    setInterval(() => {
-      stockList.forEach(name => prices[name] = Math.max(10, Math.floor(prices[name] * 0.5)));
-    }, 100000); // 폭락
-    setInterval(() => {
-      stockList.forEach(name => prices[name] = Math.floor(prices[name] * 2.2));
-    }, 150000); // 폭등
-  </script>
-</body>
-</html>
+</div>
