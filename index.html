@@ -1,310 +1,238 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8" />
-<title>모의주식 시뮬레이터 (롱+숏)</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  #stockList button { margin: 3px; padding: 5px 10px; }
-  #tradeArea { margin-top: 20px; }
-  #tradeArea input { width: 80px; }
-  #log { margin-top: 20px; max-height: 200px; overflow-y: auto; background: #f0f0f0; padding: 10px; }
-  #portfolio { margin-top: 20px; }
-  button { cursor: pointer; }
-</style>
+  <meta charset="UTF-8" />
+  <title>모의 주식 시뮬레이터</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #stockList button { margin: 2px; }
+    canvas { max-width: 100%; height: 300px; }
+  </style>
 </head>
 <body>
+  <h1>📈 모의 주식 시뮬레이터</h1>
+  <div>현재 자산: <span id="cash"></span>원</div>
+  <div>총 평가금액: <span id="totalValue"></span>원 | 수익률: <span id="roi"></span>%</div>
 
-<h1>모의주식 시뮬레이터 (롱+숏 포지션)</h1>
-<div>이름: <input id="userName" placeholder="이름 입력" /></div>
-<button id="btnSaveName">이름 저장</button>
-<div id="welcomeMsg"></div>
-<hr />
+  <select id="stockSelect"></select>
+  <div>
+    수량: <input type="number" id="amount" value="1" min="1" />
+    <button onclick="buyStock()">매수</button>
+    <button onclick="sellStock()">매도</button>
+    <button onclick="shortStock()">숏</button>
+    <button onclick="coverShort()">숏 청산</button>
+  </div>
 
-<div><strong>현금:</strong> <span id="cashDisplay"></span> 원</div>
-<div><strong>선택 종목:</strong> <span id="selectedStockName"></span></div>
-<div><strong>현재가:</strong> <span id="currentPrice"></span> 원</div>
-<div><strong>보유 주식 수량 (롱):</strong> <span id="ownedLong"></span> 주</div>
-<div><strong>보유 주식 수량 (숏):</strong> <span id="ownedShort"></span> 주</div>
+  <div id="stockInfo"></div>
+  <canvas id="stockChart"></canvas>
 
-<div id="stockList"></div>
+  <script>
+    const stocks = [
+      { name: '삼성전자', price: 70000 },
+      { name: 'LG화학', price: 520000 },
+      { name: '현대차', price: 190000 },
+      { name: 'NAVER', price: 250000 },
+      { name: '카카오', price: 115000 },
+      { name: 'SK하이닉스', price: 140000 },
+      { name: '셀트리온', price: 185000 },
+      { name: '포스코', price: 320000 },
+      { name: '한화솔루션', price: 50000 },
+      { name: 'CJ제일제당', price: 350000 },
+      { name: '두산에너빌리티', price: 23000 },
+      { name: 'LG에너지솔루션', price: 420000 },
+      { name: '현대모비스', price: 210000 },
+      { name: '롯데케미칼', price: 190000 },
+      { name: '저가테스트종목', price: 1000 } // 저가 종목
+    ];
 
-<div id="tradeArea">
-  <input type="number" id="tradeAmount" min="1" value="1" />
-  <br><br>
-  <button id="btnBuy">매수 (롱 포지션 진입)</button>
-  <button id="btnSell">매도 (롱 포지션 청산)</button>
-  <br><br>
-  <button id="btnShortSell">숏 포지션 진입 (공매도)</button>
-  <button id="btnShortCover">숏 포지션 청산 (공매수)</button>
-  <br><br>
-  <p>최대 매수 가능 수량 (롱): <span id="maxBuy"></span></p>
-  <p>최대 매도 가능 수량 (롱): <span id="maxSell"></span></p>
-  <p>최대 숏 진입 가능 수량: <span id="maxShortSell"></span></p>
-  <p>최대 숏 청산 가능 수량: <span id="maxShortCover"></span></p>
-</div>
+    let portfolio = JSON.parse(localStorage.getItem('portfolio')) || {};
+    let cash = parseInt(localStorage.getItem('cash') || "100000");
 
-<canvas id="stockChart" width="600" height="300"></canvas>
+    const chartsData = {};
+    let currentStock = stocks[0].name;
+    let currentChart = null;
 
-<div id="log"><strong>거래 내역:</strong><br></div>
-
-<script>
-(() => {
-  const STOCKS = [
-    { code:"005930", name:"삼성전자", price:70000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"000660", name:"SK하이닉스", price:110000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"035420", name:"NAVER", price:350000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"051910", name:"LG화학", price:900000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"207940", name:"삼성바이오로직스", price:750000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"005380", name:"현대차", price:230000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"035720", name:"카카오", price:70000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"066570", name:"LG전자", price:110000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"012330", name:"현대모비스", price:300000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"096770", name:"SK이노베이션", price:250000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"105560", name:"KB금융", price:54000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"015760", name:"한국전력", price:23000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"028260", name:"삼성물산", price:130000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"010950", name:"S-Oil", price:65000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 },
-    { code:"000020", name:"동화약품", price:1000, longOwned:0, longAvgPrice:0, shortOwned:0, shortAvgPrice:0 }
-  ];
-
-  let state = {
-    cash: 1000000,
-    stocks: JSON.parse(JSON.stringify(STOCKS)),
-    selectedIndex: 0,
-    trades: [],
-    userName: '',
-  };
-
-  const cashDisplay = document.getElementById('cashDisplay');
-  const stockListDiv = document.getElementById('stockList');
-  const selectedStockNameSpan = document.getElementById('selectedStockName');
-  const currentPriceSpan = document.getElementById('currentPrice');
-  const ownedLongSpan = document.getElementById('ownedLong');
-  const ownedShortSpan = document.getElementById('ownedShort');
-  const tradeAmountInput = document.getElementById('tradeAmount');
-  const btnBuy = document.getElementById('btnBuy');
-  const btnSell = document.getElementById('btnSell');
-  const btnShortSell = document.getElementById('btnShortSell');
-  const btnShortCover = document.getElementById('btnShortCover');
-  const maxBuySpan = document.getElementById('maxBuy');
-  const maxSellSpan = document.getElementById('maxSell');
-  const maxShortSellSpan = document.getElementById('maxShortSell');
-  const maxShortCoverSpan = document.getElementById('maxShortCover');
-  const logDiv = document.getElementById('log');
-  const userNameInput = document.getElementById('userName');
-  const btnSaveName = document.getElementById('btnSaveName');
-  const welcomeMsg = document.getElementById('welcomeMsg');
-
-  let chart = null;
-  let chartData = {
-    labels: [],
-    datasets: [{
-      label: '',
-      data: [],
-      borderColor: 'blue',
-      backgroundColor: 'rgba(0,0,255,0.1)',
-      fill: true,
-      tension: 0.3
-    }]
-  };
-
-  function initChart(stockName){
-    if(chart) chart.destroy();
-    chartData.labels = [];
-    chartData.datasets[0].label = stockName;
-    chartData.datasets[0].data = [];
-    const ctx = document.getElementById('stockChart').getContext('2d');
-    chart = new Chart(ctx, {
-      type: 'line',
-      data: chartData,
-      options: {
-        animation: false,
-        responsive: false,
-        scales: { y: { beginAtZero: false } }
-      }
-    });
-  }
-
-  function addChartData(price){
-    const now = new Date();
-    const label = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
-    chartData.labels.push(label);
-    chartData.datasets[0].data.push(price);
-    if(chartData.labels.length > 50){
-      chartData.labels.shift();
-      chartData.datasets[0].data.shift();
+    function saveData() {
+      localStorage.setItem('portfolio', JSON.stringify(portfolio));
+      localStorage.setItem('cash', cash);
     }
-    chart.update();
-  }
 
-  function updateDisplay(){
-    const stock = state.stocks[state.selectedIndex];
-    cashDisplay.textContent = state.cash.toLocaleString();
-    selectedStockNameSpan.textContent = stock.name;
-    currentPriceSpan.textContent = stock.price.toLocaleString();
-    ownedLongSpan.textContent = stock.longOwned;
-    ownedShortSpan.textContent = stock.shortOwned;
+    function updateUI() {
+      document.getElementById('cash').innerText = cash.toLocaleString();
+      const stockInfo = document.getElementById('stockInfo');
+      stockInfo.innerHTML = '';
 
-    // 최대 매수 가능 (롱)
-    const maxBuy = Math.floor(state.cash / stock.price);
-    maxBuySpan.textContent = maxBuy;
+      let total = cash;
+      stocks.forEach(stock => {
+        const p = portfolio[stock.name] || { quantity: 0, short: 0, logs: [] };
+        const value = p.quantity * stock.price;
+        const shortLoss = p.short * stock.price;
+        total += value;
+        total -= shortLoss;
 
-    // 최대 매도 가능 (롱)
-    maxSellSpan.textContent = stock.longOwned;
+        const avg = p.logs.length ? p.logs[p.logs.length - 1].price : 0;
+        const gain = avg ? ((stock.price - avg) / avg * 100).toFixed(2) : '0.00';
+        const shortGain = avg ? ((avg - stock.price) / avg * 100).toFixed(2) : '0.00';
 
-    // 최대 숏 진입 가능 (단순히 제한 없음 혹은 최대 예산으로 제한)
-    // 여기선 최대 숏 매도 가능 수량 = Math.floor(cash / price)
-    const maxShortSell = Math.floor(state.cash / stock.price);
-    maxShortSellSpan.textContent = maxShortSell;
+        stockInfo.innerHTML += `
+          <div><strong>${stock.name}</strong> | 보유: ${p.quantity}주 | 숏: ${p.short}주 
+          | 수익률: ${gain}% | 숏 수익률: ${shortGain}%</div>`;
+      });
 
-    // 최대 숏 청산 가능 = 보유 숏 수량
-    maxShortCoverSpan.textContent = stock.shortOwned;
+      const roi = (((total - 100000) / 100000) * 100).toFixed(2);
+      document.getElementById('totalValue').innerText = total.toLocaleString();
+      document.getElementById('roi').innerText = roi;
+    }
 
-    addChartData(stock.price);
-  }
+    function buyStock() {
+      const name = currentStock;
+      const amount = parseInt(document.getElementById('amount').value);
+      const stock = stocks.find(s => s.name === name);
+      const totalCost = stock.price * amount;
+      if (cash >= totalCost) {
+        cash -= totalCost;
+        if (!portfolio[name]) portfolio[name] = { quantity: 0, short: 0, logs: [] };
+        portfolio[name].quantity += amount;
+        portfolio[name].logs.push({ action: "buy", price: stock.price, time: new Date().toLocaleString() });
+        saveData();
+        updateUI();
+      }
+    }
 
-  function logTrade(text){
-    const p = document.createElement('p');
-    p.textContent = text;
-    logDiv.appendChild(p);
-    logDiv.scrollTop = logDiv.scrollHeight;
-  }
+    function sellStock() {
+      const name = currentStock;
+      const amount = parseInt(document.getElementById('amount').value);
+      const stock = stocks.find(s => s.name === name);
+      if (portfolio[name]?.quantity >= amount) {
+        portfolio[name].quantity -= amount;
+        cash += stock.price * amount;
+        portfolio[name].logs.push({ action: "sell", price: stock.price, time: new Date().toLocaleString() });
+        saveData();
+        updateUI();
+      }
+    }
 
-  function selectStock(index){
-    state.selectedIndex = index;
-    initChart(state.stocks[index].name);
-    chartData.labels = [];
-    chartData.datasets[0].data = [];
-    updateDisplay();
-  }
+    function shortStock() {
+      const name = currentStock;
+      const amount = parseInt(document.getElementById('amount').value);
+      const stock = stocks.find(s => s.name === name);
+      if (!portfolio[name]) portfolio[name] = { quantity: 0, short: 0, logs: [] };
+      portfolio[name].short += amount;
+      cash += stock.price * amount;
+      portfolio[name].logs.push({ action: "short", price: stock.price, time: new Date().toLocaleString() });
+      saveData();
+      updateUI();
+    }
 
-  // 랜덤 가격 변동 (간단히 ±5% 변동)
-  function updatePrices(){
-    state.stocks.forEach(stock => {
-      const changePercent = (Math.random() * 10 - 5) / 100; // -5% ~ +5%
-      let newPrice = stock.price * (1 + changePercent);
-      if(newPrice < 1000) newPrice = 1000; // 최저가 제한
-      stock.price = Math.round(newPrice);
+    function coverShort() {
+      const name = currentStock;
+      const amount = parseInt(document.getElementById('amount').value);
+      const stock = stocks.find(s => s.name === name);
+      if (portfolio[name]?.short >= amount) {
+        const cost = stock.price * amount;
+        if (cash >= cost) {
+          portfolio[name].short -= amount;
+          cash -= cost;
+          portfolio[name].logs.push({ action: "cover", price: stock.price, time: new Date().toLocaleString() });
+          saveData();
+          updateUI();
+        }
+      }
+    }
+
+    function initCharts() {
+      stocks.forEach(stock => {
+        chartsData[stock.name] = { labels: [], data: [] };
+      });
+    }
+
+    function updateAllCharts() {
+      const now = new Date().toLocaleTimeString();
+      stocks.forEach(stock => {
+        const data = chartsData[stock.name];
+        data.labels.push(now);
+        data.data.push(stock.price);
+        if (data.labels.length > 50) {
+          data.labels.shift();
+          data.data.shift();
+        }
+      });
+    }
+
+    function renderChart(name) {
+      if (currentChart) currentChart.destroy();
+      const ctx = document.getElementById('stockChart').getContext('2d');
+      const data = chartsData[name];
+      currentChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: name,
+            data: data.data,
+            borderColor: 'green',
+            borderWidth: 2,
+            fill: false
+          }]
+        },
+        options: {
+          animation: false,
+          scales: {
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+
+    function updatePrices() {
+      stocks.forEach(stock => {
+        const change = (Math.random() - 0.45) * 0.1; // 약간 상승 쪽으로 기울인 랜덤
+        stock.price = Math.max(1, Math.round(stock.price * (1 + change)));
+      });
+    }
+
+    // 폭락 / 폭등 이벤트
+    setInterval(() => {
+      const stock = stocks[Math.floor(Math.random() * stocks.length)];
+      const drop = Math.random() * 0.3 + 0.7; // 70% ~ 100%
+      stock.price = Math.max(1, Math.floor(stock.price * (1 - drop)));
+    }, 100000);
+
+    setInterval(() => {
+      const stock = stocks[Math.floor(Math.random() * stocks.length)];
+      const rise = Math.random() * 0.2 + 1; // 100% ~ 120%
+      stock.price = Math.floor(stock.price * (1 + rise));
+    }, 150000);
+
+    // 주기적 업데이트
+    setInterval(() => {
+      updatePrices();
+      updateAllCharts();
+      renderChart(currentStock);
+      updateUI();
+    }, 5000);
+
+    document.getElementById('stockSelect').addEventListener('change', (e) => {
+      currentStock = e.target.value;
+      renderChart(currentStock);
     });
-    updateDisplay();
-  }
 
-  // 폭락 이벤트: 모든 주식 가격 50% 하락
-  function crashAllStocks(){
-    state.stocks.forEach(stock => {
-      stock.price = Math.max(1000, Math.round(stock.price * 0.5));
-    });
-    updateDisplay();
-    logTrade('전체 종목 폭락 발생! 주가 50% 하락');
-  }
+    function init() {
+      const select = document.getElementById('stockSelect');
+      stocks.forEach(stock => {
+        const option = document.createElement('option');
+        option.value = stock.name;
+        option.textContent = stock.name;
+        select.appendChild(option);
+      });
+      initCharts();
+      updateAllCharts();
+      renderChart(currentStock);
+      updateUI();
+    }
 
-  // 버튼 이벤트
-  btnBuy.addEventListener('click', () => {
-    const amount = Number(tradeAmountInput.value);
-    if(amount < 1) return alert('거래 수량을 1 이상 입력하세요.');
-    const stock = state.stocks[state.selectedIndex];
-    const cost = stock.price * amount;
-    if(cost > state.cash) return alert('현금이 부족합니다.');
-    state.cash -= cost;
-
-    // 평균 단가 계산
-    const totalCost = stock.longAvgPrice * stock.longOwned + cost;
-    stock.longOwned += amount;
-    stock.longAvgPrice = totalCost / stock.longOwned;
-
-    logTrade(`매수: ${stock.name} ${amount}주, 가격 ${stock.price.toLocaleString()}원`);
-    updateDisplay();
-  });
-
-  btnSell.addEventListener('click', () => {
-    const amount = Number(tradeAmountInput.value);
-    if(amount < 1) return alert('거래 수량을 1 이상 입력하세요.');
-    const stock = state.stocks[state.selectedIndex];
-    if(amount > stock.longOwned) return alert('보유 주식이 부족합니다.');
-    state.cash += stock.price * amount;
-
-    // 평균 단가 계산 (단순 청산으로 간주)
-    stock.longOwned -= amount;
-    if(stock.longOwned === 0) stock.longAvgPrice = 0;
-
-    logTrade(`매도: ${stock.name} ${amount}주, 가격 ${stock.price.toLocaleString()}원`);
-    updateDisplay();
-  });
-
-  // 숏 포지션 진입: 주식 빌려서 판매 → 현금 증가, 숏 보유 증가
-  btnShortSell.addEventListener('click', () => {
-    const amount = Number(tradeAmountInput.value);
-    if(amount < 1) return alert('거래 수량을 1 이상 입력하세요.');
-    const stock = state.stocks[state.selectedIndex];
-    const maxShort = Math.floor(state.cash / stock.price);
-    if(amount > maxShort) return alert('현금으로 감당 가능한 최대 숏 진입 수량을 초과했습니다.');
-
-    state.cash += stock.price * amount;  // 숏 포지션 진입시 주가 * 수량 현금 증가
-    const totalShortCost = stock.shortAvgPrice * stock.shortOwned + stock.price * amount;
-    stock.shortOwned += amount;
-    stock.shortAvgPrice = totalShortCost / stock.shortOwned;
-
-    logTrade(`숏 포지션 진입 (공매도): ${stock.name} ${amount}주, 가격 ${stock.price.toLocaleString()}원`);
-    updateDisplay();
-  });
-
-  // 숏 포지션 청산: 주식 다시 사서 빌린 주식 갚음 → 현금 감소, 숏 보유 감소
-  btnShortCover.addEventListener('click', () => {
-    const amount = Number(tradeAmountInput.value);
-    if(amount < 1) return alert('거래 수량을 1 이상 입력하세요.');
-    const stock = state.stocks[state.selectedIndex];
-    if(amount > stock.shortOwned) return alert('숏 포지션 보유 수량보다 많습니다.');
-    const cost = stock.price * amount;
-    if(cost > state.cash) return alert('현금이 부족하여 숏 포지션을 청산할 수 없습니다.');
-
-    state.cash -= cost;
-    stock.shortOwned -= amount;
-    if(stock.shortOwned === 0) stock.shortAvgPrice = 0;
-
-    logTrade(`숏 포지션 청산 (공매수): ${stock.name} ${amount}주, 가격 ${stock.price.toLocaleString()}원`);
-    updateDisplay();
-  });
-
-  // 종목 버튼 생성
-  function renderStockButtons(){
-    stockListDiv.innerHTML = '';
-    state.stocks.forEach((stock, i) => {
-      const btn = document.createElement('button');
-      btn.textContent = `${stock.name} (${stock.price.toLocaleString()}원)`;
-      btn.onclick = () => {
-        selectStock(i);
-      };
-      stockListDiv.appendChild(btn);
-    });
-  }
-
-  // 이름 저장
-  btnSaveName.addEventListener('click', () => {
-    const name = userNameInput.value.trim();
-    if(name === '') return alert('이름을 입력하세요.');
-    state.userName = name;
-    welcomeMsg.textContent = `${name}님, 환영합니다!`;
-    userNameInput.value = '';
-  });
-
-  // 1초마다 주가 업데이트 (±5% 변동)
-  setInterval(() => {
-    updatePrices();
-  }, 1000);
-
-  // 100초마다 전체 폭락 (50% 하락)
-  setInterval(() => {
-    crashAllStocks();
-  }, 100000);
-
-  // 초기화
-  renderStockButtons();
-  selectStock(0);
-
-})();
-</script>
-
+    init();
+  </script>
 </body>
 </html>
