@@ -7,10 +7,11 @@
   <style>
     body { font-family: sans-serif; display: flex; gap: 30px; padding: 20px; }
     .left, .right { flex: 1; }
-    .right { height: 90vh; overflow-y: scroll; }
-    canvas { max-width: 100%; height: 200px; }
+    .right { height: 90vh; overflow-y: auto; }
+    canvas { max-width: 100%; height: 300px; }
     table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 4px 8px; }
     .chart-container { margin-bottom: 20px; }
+    #chartSelector { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -33,7 +34,11 @@
     <h3>수익률 랭킹</h3>
     <table id="ranking"><thead><tr><th>이름</th><th>수익률</th></tr></thead><tbody></tbody></table>
   </div>
-  <div class="right" id="charts"></div>
+
+  <div class="right">
+    <select id="chartSelector"></select>
+    <div id="charts"></div>
+  </div>
 
   <script>
     const stockList = [
@@ -49,7 +54,6 @@
 
     let money = 100000;
     let username = localStorage.getItem("sim_name") || "";
-
     if (username) document.getElementById("username").value = username;
 
     function saveName() {
@@ -69,8 +73,9 @@
       });
 
       updateStockUI();
-      updateChartUI();
-      updateSelect();
+      updateTradeSelect();
+      updateChartSelect();
+      renderChart(stockList[0]);
       updateDisplay();
     }
 
@@ -82,45 +87,7 @@
       }
     }
 
-    function updateChartUI() {
-      const chartArea = document.getElementById("charts");
-      chartArea.innerHTML = "";
-      stockList.forEach(name => {
-        const container = document.createElement("div");
-        container.className = "chart-container";
-        const title = document.createElement("h4");
-        title.innerText = name;
-        const canvas = document.createElement("canvas");
-        canvas.id = "chart-" + name;
-        container.appendChild(title);
-        container.appendChild(canvas);
-        chartArea.appendChild(container);
-
-        const ctx = canvas.getContext("2d");
-        charts[name] = new Chart(ctx, {
-          type: "line",
-          data: {
-            labels: priceHistories[name].map((_, i) => i),
-            datasets: [{
-              label: name,
-              data: priceHistories[name],
-              borderColor: "blue",
-              fill: false
-            }]
-          },
-          options: {
-            responsive: true,
-            animation: false,
-            scales: {
-              x: { display: false },
-              y: { beginAtZero: false }
-            }
-          }
-        });
-      });
-    }
-
-    function updateSelect() {
+    function updateTradeSelect() {
       const sel = document.getElementById("tradeStock");
       stockList.forEach(name => {
         const opt = document.createElement("option");
@@ -130,17 +97,64 @@
       });
     }
 
+    function updateChartSelect() {
+      const sel = document.getElementById("chartSelector");
+      stockList.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.innerText = name;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener("change", () => renderChart(sel.value));
+    }
+
+    function renderChart(name) {
+      const chartArea = document.getElementById("charts");
+      chartArea.innerHTML = "";
+      const container = document.createElement("div");
+      container.className = "chart-container";
+      const canvas = document.createElement("canvas");
+      canvas.id = "chart-" + name;
+      container.appendChild(canvas);
+      chartArea.appendChild(container);
+
+      const ctx = canvas.getContext("2d");
+      charts[name] = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: priceHistories[name].map((_, i) => i),
+          datasets: [{
+            label: name,
+            data: priceHistories[name],
+            borderColor: "blue",
+            fill: false
+          }]
+        },
+        options: {
+          responsive: true,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: { beginAtZero: false }
+          }
+        }
+      });
+    }
+
     function updatePrices() {
       for (const name of stockList) {
         const price = prices[name];
-        const change = price * (Math.random() * 0.02 - 0.003); // -0.3% ~ +1.7%
+        const change = price * (Math.random() * 0.02 - 0.003);
         prices[name] = Math.max(10, Math.floor(price + change));
         priceHistories[name].push(prices[name]);
         if (priceHistories[name].length > 50) priceHistories[name].shift();
 
-        charts[name].data.labels = priceHistories[name].map((_, i) => i);
-        charts[name].data.datasets[0].data = priceHistories[name];
-        charts[name].update();
+        const currentSel = document.getElementById("chartSelector").value;
+        if (charts[currentSel]) {
+          charts[currentSel].data.labels = priceHistories[currentSel].map((_, i) => i);
+          charts[currentSel].data.datasets[0].data = priceHistories[currentSel];
+          charts[currentSel].update();
+        }
       }
       updateDisplay();
     }
