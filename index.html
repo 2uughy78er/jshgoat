@@ -43,7 +43,6 @@
     <textarea id="logArea" readonly></textarea>
   </div>
 
-  <!-- ✅ 초기화 버튼 패널 -->
   <div class="panel">
     <button onclick="resetAllData()" style="background: red; color: white; padding: 8px 12px; border: none; border-radius: 6px;">🗑️ 초기화</button>
   </div>
@@ -144,6 +143,20 @@
     }
 
     function shortStock() {
+      // 현재 총자산 계산
+      let totalAssets = cash;
+      stocks.forEach(s => {
+        const p = portfolio[s.name];
+        if (p) {
+          totalAssets += (p.quantity - p.short) * s.price;
+        }
+      });
+
+      if (totalAssets >= 0) {
+        alert("⚠️ 자산이 0보다 작을 때만 숏 포지션을 사용할 수 있습니다!");
+        return;
+      }
+
       const stock = stocks.find(s => s.name === currentStock);
       const amount = parseInt(document.getElementById('amount').value);
       if (!portfolio[currentStock]) portfolio[currentStock] = { quantity: 0, short: 0, logs: [] };
