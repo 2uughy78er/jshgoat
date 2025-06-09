@@ -169,7 +169,7 @@
 
     // 랜덤 가격 생성 함수
     function getRandomPrice(prevPrice) {
-      const changePercent = (Math.random() - 0.5) * 2; // -10% ~ +10%
+      const changePercent = (Math.random() - 0.45) * 0.1; // -5% ~ +5%
       const newPrice = prevPrice * (1 + changePercent);
       return Math.max(1, Math.round(newPrice));
     }
@@ -476,30 +476,16 @@
       });
     }
 
-// 이름 설정 버튼 이벤트
+    // 이름 설정 버튼 이벤트
     setNameBtn.onclick = () => {
       const name = userNameInput.value.trim();
-      if (!name) return alert("이름을 입력해주세요.");
+      if (!name) return alert("이름을 입력하세요.");
+      if (name.includes('|')) return alert("이름에 '|' 문자는 사용할 수 없습니다.");
+
       initCurrentUser(name);
-    };
+      alert("이름이 설정되었습니다.");
 
-    // 초기 실행
-    window.onload = () => {
-      initStockData();
-      createStockButtons();
-      initChart();
-      loadUsersData();
-
-      const savedName = localStorage.getItem("currentUserName");
-      if (savedName) {
-        initCurrentUser(savedName);
-      }
-
-      selectStock(currentStock);
-      priceUpdateInterval = setInterval(updateStockPrices, 1000);
-    };
-
-   // 타이머가 이미 돌고 있으면 종료 후 재시작 (중복방지)
+      // 타이머가 이미 돌고 있으면 종료 후 재시작 (중복방지)
       if (priceUpdateInterval) clearInterval(priceUpdateInterval);
       priceUpdateInterval = setInterval(() => {
         updateStockPrices();
@@ -529,7 +515,8 @@
         updateStockPrices();
       }, 1000);
     }
-function init() {
+
+   function init() {
   loadUsersData();
   initStockData();
   createStockButtons();
@@ -542,11 +529,11 @@ function init() {
   selectStock(currentStock);
 
   setInterval(updateStockPrices, 1000);       // 일반 업데이트
-  setInterval(triggerCrash, 100000);       // ✅ 100초마다 폭락
-  setInterval(triggerBoom, 150000);        // ✅ 150초마다 폭등 
+  setInterval(triggerCrash, 100000);       // ✅ 100초마다 폭락 (제거됨)
+  setInterval(triggerBoom, 150000);        // ✅ 150초마다 폭등 (제거됨)
   setInterval(updateHoldingsDisplay, 3000);   // 보유 수량 갱신
-}
-    init();
+   }
+    
   </script>
 </body>
 </html>
