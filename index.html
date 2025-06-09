@@ -4,37 +4,71 @@
   <meta charset="UTF-8" />
   <title>📈 모의 주식 시뮬레이터</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
+    <style>
     :root {
-      --bg-color: #f7f9fb;
-      --text-color: #000;
+      --bg-color: #f9fafc;
+      --text-color: #111;
       --panel-color: #fff;
+      --primary-color: #007bff;
+      --hover-color: #0056b3;
+      --danger-color: #dc3545;
     }
 
     body.dark {
       --bg-color: #1e1e1e;
       --text-color: #ddd;
       --panel-color: #2c2c2c;
+      --primary-color: #3399ff;
+      --hover-color: #0066cc;
+      --danger-color: #ff4d4d;
     }
 
     body {
-      font-family: sans-serif;
-      padding: 20px;
+      font-family: 'Segoe UI', sans-serif;
       background: var(--bg-color);
       color: var(--text-color);
-      transition: all 0.3s;
+      margin: 0;
+      padding: 20px;
+      transition: background 0.3s, color 0.3s;
     }
 
     h1 {
       text-align: center;
+      font-size: 1.8em;
+      margin: 0;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .top-bar button {
+      background: #555;
+      color: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .top-bar button:hover {
+      background: #333;
     }
 
     .panel {
       background: var(--panel-color);
       border-radius: 12px;
-      padding: 20px;
+      padding: 16px 20px;
       margin-bottom: 20px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .panel h3 {
+      margin-top: 0;
     }
 
     #stockChart {
@@ -44,49 +78,73 @@
 
     textarea {
       width: 100%;
-      height: 100px;
-      background: #f0f0f0;
+      height: 120px;
+      background: #f1f1f1;
       border: none;
       padding: 10px;
       border-radius: 8px;
+      resize: none;
+      font-size: 14px;
+    }
+
+    .dark textarea {
+      background: #444;
+      color: #eee;
     }
 
     button {
       cursor: pointer;
-      padding: 8px 12px;
+      padding: 8px 14px;
       margin: 4px 2px;
       border-radius: 6px;
       border: none;
-      background-color: #007bff;
+      background-color: var(--primary-color);
       color: white;
+      font-size: 14px;
     }
 
     button:hover {
-      background-color: #0056b3;
+      background-color: var(--hover-color);
+    }
+
+    .reset-button {
+      background: var(--danger-color);
     }
 
     select, input {
-      padding: 6px;
+      padding: 7px 10px;
       border-radius: 6px;
       border: 1px solid #ccc;
       margin-right: 8px;
+      font-size: 14px;
     }
 
-    .dark select, .dark input, .dark textarea {
+    .dark select, .dark input {
       background: #444;
       color: #eee;
       border: 1px solid #666;
     }
 
-    .top-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    #stockInfo > div {
+      margin: 6px 0;
+      padding: 6px 8px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
     }
 
-    .top-bar button {
-      background: #333;
-      color: #fff;
+    .dark #stockInfo > div {
+      border-color: #444;
+    }
+
+    #stockInfo {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 10px;
+    }
+
+    #stockInfo b {
+      display: inline-block;
+      min-width: 100px;
     }
   </style>
 </head>
