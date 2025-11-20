@@ -1,40 +1,248 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>📈 모의 주식 시뮬레이터</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-    :root {
-      --bg-color: #f9fafc;
-      --text-color: #111;
-      --panel-color: #fff;
-      --primary-color: #007bff;
-      --hover-color: #0056b3;
-      --danger-color: #dc3545;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>온라인 바카라</title>
+<style>
+    body { font-family: Arial; background: #006400; color: #fff; text-align: center; margin: 0; padding: 0; }
+    .table { width: 90%; margin: 20px auto; background: #0a3d0a; border-radius: 10px; padding: 20px; }
+    .cards { display: flex; justify-content: center; margin: 10px 0; }
+    .hand { margin: 0 20px; }
+    .card { width: 60px; height: 90px; border-radius: 5px; background: white; color: black; font-weight: bold;
+            display: flex; align-items: center; justify-content: center; margin: 0 5px; }
+    .chip-container { margin: 10px 0; }
+    .chip { display: inline-block; width: 60px; height: 60px; border-radius: 50%; background: gold; color: black;
+            line-height: 60px; font-weight: bold; margin: 5px; cursor: pointer; user-select: none; }
+    .chip:hover { transform: scale(1.2); }
+    button { padding: 10px 20px; margin: 5px; font-size: 16px; cursor: pointer; }
+    .info { margin: 10px 0; font-size: 18px; }
+    .history { margin-top: 15px; }
+    .history span { display: inline-block; width: 50px; height: 30px; line-height: 30px; border-radius: 5px; margin: 0 2px; }
+    .PLAYER { background: blue; }
+    .BANKER { background: red; }
+    .TIE { background: green; }
+</style>
+</head>
+<body>
 
-    body.dark {
-      --bg-color: #1e1e1e;
-      --text-color: #ddd;
-      --panel-color: #2c2c2c;
-      --primary-color: #3399ff;
-      --hover-color: #0066cc;
-      --danger-color: #ff4d4d;
-    }
+<div class="table">
+    <div class="info" id="money">보유금액: 10000원</div>
+    <div class="info" id="countdown">배팅 제한시간: 10초</div>
+    
+    <div>
+        <label><input type="radio" name="target" value="PLAYER" checked> PLAYER</label>
+        <label><input type="radio" name="target" value="BANKER"> BANKER</label>
+        <label><input type="radio" name="target" value="TIE"> TIE</label>
+    </div>
 
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: var(--bg-color);
-      color: var(--text-color);
-      margin: 0;
-      padding: 20px;
-      transition: background 0.3s, color 0.3s;
-    }
+    <div class="chip-container">
+        <div class="chip" data-value="500">500</div>
+        <div class="chip" data-value="1000">1000</div>
+        <div class="chip" data-value="5000">5000</div>
+        <div class="chip" data-value="10000">10000</div>
+    </div>
 
-    h1 {
-      text-align: center;
-      font-size: 1.8em;
+    <div class="info" id="bet">현재 베팅: 0원</div>
+
+    <div class="cards">
+        <div class="hand">
+            <div>PLAYER</div>
+            <div id="player-cards" style="display:flex"></div>
+            <div id="player-score"></div>
+        </div>
+        <div class="hand">
+            <div>BANKER</div>
+            <div id="banker-cards" style="display:flex"></div>
+            <div id="banker-score"></div>
+        </div>
+    </div>
+
+    <div class="info" id="result"></div>
+    <button id="startBtn">딜 시작</button>
+    
+    <div class="history" id="history">히스토리:</div>
+</div>
+
+<script>
+let money = 10000;
+let bet = 0;
+let target = 'PLAYER';
+let deck = [];
+let playerHand = [];
+let bankerHand = [];
+let history = [];
+let countdown = 10;
+let timer;
+
+function createDeck() {
+    const suits = ["♠", "♥", "♣", "♦"];
+    const ranks = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
+    let d = [];
+    for(let s of suits){
+        for(let r of ranks){
+            d.push({suit:s, rank:r});
+        }
+    }
+    return shuffle(d);
+}
+
+function shuffle(array) {
+    for(let i=array.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [array[i], array[j]]=[array[j], array[i]];
+    }
+    return array;
+}
+
+function cardValue(rank){
+    if(rank==="A") return 1;
+    if(["10","J","Q","K"].includes(rank)) return 0;
+    return parseInt(rank);
+}
+
+function baccaratScore(hand){
+    let total = hand.reduce((sum,c)=>sum+cardValue(c.rank),0);
+    return total%10;
+}
+
+function bankerDrawRule(bScore,pThird){
+    if(!pThird) return bScore<=5;
+    let pt = cardValue(pThird.rank);
+    if(bScore<=2) return true;
+    if(bScore===3 && pt!==8) return true;
+    if(bScore===4 && [2,3,4,5,6,7].includes(pt)) return true;
+    if(bScore===5 && [4,5,6,7].includes(pt)) return true;
+    if(bScore===6 && [6,7].includes(pt)) return true;
+    return false;
+}
+
+// ---------------------------
+function updateUI(){
+    document.getElementById("money").innerText=`보유금액: ${money}원`;
+    document.getElementById("bet").innerText=`현재 베팅: ${bet}원`;
+    document.querySelectorAll('input[name="target"]').forEach(r=>{
+        if(r.checked) target = r.value;
+    });
+}
+
+function addBet(val){
+    if(bet+val>money){alert("보유금액 초과!"); return;}
+    bet += val;
+    updateUI();
+}
+
+document.querySelectorAll(".chip").forEach(c=>{
+    c.addEventListener("click",()=> addBet(Number(c.dataset.value)));
+});
+
+document.getElementById("startBtn").addEventListener("click",()=>startRound());
+
+function startCountdown(){
+    countdown=10;
+    document.getElementById("countdown").innerText=`배팅 제한시간: ${countdown}초`;
+    timer = setInterval(()=>{
+        countdown--;
+        if(countdown<=0){
+            clearInterval(timer);
+            document.getElementById("countdown").innerText="시간 종료! 자동 게임 시작";
+            startRound();
+        } else {
+            document.getElementById("countdown").innerText=`배팅 제한시간: ${countdown}초`;
+        }
+    },1000);
+}
+
+function startRound(){
+    if(bet<500){bet = Math.min(500,money);}
+    if(bet>money) bet=money;
+    money -= bet;
+    updateUI();
+    clearInterval(timer);
+
+    deck=createDeck();
+    playerHand=[]; bankerHand=[];
+    document.getElementById("player-cards").innerHTML="";
+    document.getElementById("banker-cards").innerHTML="";
+    document.getElementById("player-score").innerText="";
+    document.getElementById("banker-score").innerText="";
+    document.getElementById("result").innerText="";
+
+    dealInitialCards();
+}
+
+async function dealInitialCards(){
+    await revealCard('player', playerHand, deck.pop());
+    await revealCard('banker', bankerHand, deck.pop());
+    await revealCard('player', playerHand, deck.pop());
+    await revealCard('banker', bankerHand, deck.pop());
+    drawRules();
+}
+
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+
+async function revealCard(handType, hand, card){
+    hand.push(card);
+    let container=document.getElementById(handType+"-cards");
+    let div=document.createElement("div");
+    div.className="card";
+    div.innerText=`${card.suit}${card.rank}`;
+    container.appendChild(div);
+    if(handType==="player")
+        document.getElementById("player-score").innerText=`점수: ${baccaratScore(hand)}`;
+    else
+        document.getElementById("banker-score").innerText=`점수: ${baccaratScore(hand)}`;
+    await sleep(500);
+}
+
+async function drawRules(){
+    let pScore = baccaratScore(playerHand);
+    let bScore = baccaratScore(bankerHand);
+    if(pScore>=8 || bScore>=8){finishRound(); return;}
+    let pThird = null;
+    if(pScore<=5){
+        pThird = deck.pop();
+        await revealCard('player',playerHand,pThird);
+    }
+    if(bankerDrawRule(bScore,pThird)){
+        let bThird = deck.pop();
+        await revealCard('banker',bankerHand,bThird);
+    }
+    finishRound();
+}
+
+function finishRound(){
+    let pScore=baccaratScore(playerHand);
+    let bScore=baccaratScore(bankerHand);
+    let winner;
+    if(pScore>bScore) winner="PLAYER";
+    else if(bScore>pScore) winner="BANKER";
+    else winner="TIE";
+
+    let winAmount =0;
+    if(winner===target){
+        if(winner==="PLAYER") winAmount=bet*2;
+        else if(winner==="BANKER") winAmount=Math.floor(bet*1.95);
+        else winAmount=bet*8;
+        money+=winAmount;
+        document.getElementById("result").innerText=`${winner} 승리! +${winAmount-bet}원`;
+    } else document.getElementById("result").innerText=`${winner} 승리! 베팅 실패!`;
+
+    history.push(winner);
+    if(history.length>10) history.shift();
+    document.getElementById("history").innerHTML="히스토리: "+history.map(h=>`<span class="${h}">${h}</span>`).join(" ");
+
+    bet=0;
+    updateUI();
+    startCountdown();
+}
+
+// 최초 카운트다운 시작
+startCountdown();
+
+</script>
+</body>
+</html>      font-size: 1.8em;
       margin: 0;
     }
 
@@ -418,3 +626,4 @@
   </script>
 </body>
 </html>
+
