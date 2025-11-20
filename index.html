@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>온라인 카지노 스타일 바카라</title>
+<title>온라인 카지노 스타일 바카라 (데모)</title>
 <style>
-body { font-family: Arial; background: #006400; color: #fff; text-align: center; margin:0; padding:0; }
-.table { width: 90%; margin: 20px auto; background: #0a3d0a; border-radius: 10px; padding: 20px; position: relative;}
-.cards { display:flex; justify-content: center; margin:10px 0;}
+body { font-family: Arial; background: #006400; color: #fff; margin:0; padding:0; text-align:center; }
+.table { width: 90%; margin: 20px auto; background: #0a3d0a; border-radius: 10px; padding: 20px; position:relative; }
+.cards { display:flex; justify-content:center; margin:10px 0;}
 .hand { margin:0 20px;}
 .card { width:60px; height:90px; border-radius:5px; background:white; color:black; font-weight:bold;
        display:flex; align-items:center; justify-content:center; margin:0 5px; transition: transform 0.3s; }
@@ -74,6 +74,7 @@ let countdown=10;
 let timer;
 let draggingChip=null;
 
+// 덱 생성
 function createDeck(){
     const suits=["♠","♥","♣","♦"];
     const ranks=["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -82,14 +83,17 @@ function createDeck(){
     return shuffle(d);
 }
 
+// 셔플
 function shuffle(array){for(let i=array.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [array[i],array[j]]=[array[j],array[i]];} return array;}
 
+// 카드 값
 function cardValue(rank){if(rank==="A") return 1; if(["10","J","Q","K"].includes(rank)) return 0; return parseInt(rank);}
 function baccaratScore(hand){return hand.reduce((sum,c)=>sum+cardValue(c.rank),0)%10;}
 function bankerDrawRule(bScore,pThird){if(!pThird) return bScore<=5; let pt=cardValue(pThird.rank); if(bScore<=2) return true;
  if(bScore===3 && pt!==8) return true; if(bScore===4 && [2,3,4,5,6,7].includes(pt)) return true;
  if(bScore===5 && [4,5,6,7].includes(pt)) return true; if(bScore===6 && [6,7].includes(pt)) return true; return false;}
 
+// UI 업데이트
 function updateUI(){
     document.getElementById("money").innerText=`보유금액: ${money}원`;
     for(let t in betAmounts){
@@ -97,24 +101,17 @@ function updateUI(){
     }
 }
 
+// 칩 드래그 이벤트
 document.querySelectorAll(".chip").forEach(c=>{
-    c.addEventListener("mousedown",(e)=>{
-        draggingChip=c;
-        c.classList.add("dragging");
-    });
+    c.addEventListener("mousedown",(e)=>{draggingChip=c;c.classList.add("dragging");});
 });
-
 document.addEventListener("mouseup",(e)=>{
     if(draggingChip){
         document.querySelectorAll(".bet-box").forEach(box=>{
             let rect=box.getBoundingClientRect();
             if(e.clientX>rect.left && e.clientX<rect.right && e.clientY>rect.top && e.clientY<rect.bottom){
                 let val=Number(draggingChip.dataset.value);
-                if(money>=val){
-                    betAmounts[box.id]+=val;
-                    money-=val;
-                    updateUI();
-                }
+                if(money>=val){betAmounts[box.id]+=val; money-=val; updateUI();}
             }
         });
         draggingChip.classList.remove("dragging");
@@ -122,6 +119,7 @@ document.addEventListener("mouseup",(e)=>{
     }
 });
 
+// 카운트다운
 function startCountdown(){
     countdown=10;
     document.getElementById("countdown").innerText=`배팅 제한시간: ${countdown}초`;
@@ -132,6 +130,7 @@ function startCountdown(){
     },1000);
 }
 
+// 라운드 시작
 async function startRound(){
     clearInterval(timer);
     deck=createDeck();
@@ -148,6 +147,7 @@ async function startRound(){
     startCountdown();
 }
 
+// 카드 공개
 function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 async function revealCard(handType,hand,card){
     hand.push(card);
@@ -161,6 +161,7 @@ async function revealCard(handType,hand,card){
     await sleep(500);
 }
 
+// 초기 카드 2장씩
 async function dealInitialCards(){
     await revealCard('player',playerHand,deck.pop());
     await revealCard('banker',bankerHand,deck.pop());
@@ -168,6 +169,7 @@ async function dealInitialCards(){
     await revealCard('banker',bankerHand,deck.pop());
 }
 
+// 3장 규칙 적용
 async function drawRules(){
     let pScore=baccaratScore(playerHand);
     let bScore=baccaratScore(bankerHand);
@@ -177,6 +179,7 @@ async function drawRules(){
     if(bankerDrawRule(bScore,pThird)){let bThird=deck.pop(); await revealCard('banker',bankerHand,bThird);}
 }
 
+// 라운드 종료 처리
 function finishRound(){
     let pScore=baccaratScore(playerHand);
     let bScore=baccaratScore(bankerHand);
@@ -185,13 +188,12 @@ function finishRound(){
     else if(bScore>pScore) winner="BANKER";
     else winner="TIE";
 
-    // 배팅 결과 계산
+    // 배팅 결과
     for(let t in betAmounts){
         let amt=betAmounts[t];
         if(amt>0){
-            if(winner==="TIE" && (t==="PLAYER"||t==="BANKER")){
-                money+=amt; // 원금 반환
-            } else if(t===winner){
+            if(winner==="TIE" && (t==="PLAYER"||t==="BANKER")) money+=amt;
+            else if(t===winner){
                 if(winner==="PLAYER") money+=amt*2;
                 else if(winner==="BANKER") money+=Math.floor(amt*1.95);
                 else if(winner==="TIE") money+=amt*8;
